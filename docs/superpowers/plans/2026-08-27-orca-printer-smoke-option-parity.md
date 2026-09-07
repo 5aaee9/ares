@@ -9918,3 +9918,13 @@ segment earlier (retract consumed → tail dropped) or rounds it
 differently. NEXT: extract my wipe segment list for this exact
 loop (wipe_moves state on anchor 02815e7 layer 1 outer wall) and
 count pure-XY tail moves; the missing segment lands at 179.715.
+
+Correction (cont 467): the 179.715 pair is at loop START (approach),
+not loop end — both mine and GT: travel F7200 → 179.715 (mine ×1 /
+GT ×2) → 164.89/179.89 (= the seam, wall E starts there) → ... the
+wipe tail (164.851 179.88) and WIPE_START come LATER at loop end.
+So the duplicate is a second pre-seam approach move at loop start.
+Candidates: scarf-joint start emission (seam_slope), loop
+clip/re-approach, or the extrude-to-seam-gap staging. My port emits
+one 179.715 (correct first move); the second identical move is the
+missing emission.
