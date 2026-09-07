@@ -9745,3 +9745,19 @@ the chunk where they land. NEXT: align my per-layer slice to start
 exactly at ;LAYER_CHANGE (currently starts at the
 ;__ARES_PART_FAN_STATE__ marker line before it) and re-run the
 per-layer flush comparison.
+
+## 2026-09-07 (cont 458): mover input = POST-cooling text; boundary shape matches
+
+Verified the slice shape: after cooling.finish_layer's splice, my
+layer slice reads `M106 S.. / ;LAYER_CHANGE / ...` — the SAME shape
+as upstream chunk output (chunk-2 output starts `M106 S255` then the
+marker). The PRECOOLING dump diffs (`;_EXTRUDE_END` tails) are
+pre-cooling artifacts already stripped before the mover would see
+them, so the boundary hypothesis is CONFIRMED aligned; the 743
+per-layer result therefore comes from CONTENT divergence inside the
+mover processing itself (buffer-time arithmetic on my layer text vs
+upstream's), not the boundary. NEXT: add a POSTCOOLING dump of the
+exact bytes passed to the mover per layer (already exists as
+=== POSTCOOLING === in ARES_DUMP_PRECOOLING) and diff against the
+GT chunk OUTPUT dumps (gt_fanout) line-by-line for layer 1 — the
+first divergent line localizes the mover-logic divergence.
