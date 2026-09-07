@@ -9997,3 +9997,22 @@ or middle_point_offset quantization. NEXT: dump my boundary contour
 vertices near (4775000,4775000) and compare against GT's detour
 waypoints A,B; check upstream AvoidCrossingPerimeters::travel_to
 middle_point computation for the 1-unit vertex origin.
+
+## 2026-09-07 (cont 471): loop fragmentation IDENTICAL; deficit = 1 detour waypoint at loop start
+
+ARES_DUMP_LOOPS (scarf::build head, temp): my 284 wall loops are
+byte-identical to GT plaindump — paths=1 everywhere, first points
+match ((4110845,4110845)…(4775000,4775000)). Loop emission is NOT
+the deficit. GT wall-loop start = travel legs [A=(4773250,4773250),
+B=(4773251,4773251), C=(4775000,4775000)]; mine = [A, C] — missing
+exactly ONE detour waypoint line (70 loops × 1 line = the family).
+NEW ANOMALY: my ARES_DUMP_ROUTE shows all 70 wall travels with a
+CONSTANT start (4670002,4640002) and target (4890001,4890001) —
+not any loop's first point (4775000) and not the true nozzle
+position; +11.5001mm skew vs loop space. Suspects: stale
+state.x/y at plan_route time, double-applied offset in to_scaled,
+or the wipe re-plan calling plan_route with pre-travel coordinates.
+NEXT: trace state.x/y updates around start_travel (line ~70/91);
+find why the 70 wall-loop travels' router inputs are constant;
+then make the grazing detour emit both A and B waypoints (GT
+n=2 intersections 1 unit apart; my n=2 but waypoints far away).
