@@ -1,16 +1,20 @@
 //! OrcaSlicer parity suite: slices vendor printer profiles with both the
 //! OrcaSlicer 2.4.2 CLI and Ares and compares the G-code with the KSR
-//! semantic comparator.
+//! semantic comparator (partial semantic evidence, NOT full-output parity).
 //!
 //! Environment-gated: runs only when `ARES_ORCA_BIN` (or the repository
 //! wrapper `scripts/orca-parity.sh`) names a working OrcaSlicer CLI.
 
+#[path = "orca_parity/artifacts.rs"]
+mod artifacts;
 #[path = "orca_parity/option_coverage.rs"]
 mod option_coverage;
 #[path = "orca_parity/presets.rs"]
 mod presets;
 #[path = "orca_parity/replay.rs"]
 mod replay;
+#[path = "orca_parity/replay_tests.rs"]
+mod replay_tests;
 #[path = "orca_parity/runner.rs"]
 mod runner;
 #[path = "orca_parity/smoke.rs"]
@@ -36,33 +40,29 @@ pub(crate) struct ParityOutcome {
     pub(crate) label: String,
     pub(crate) status: &'static str,
     pub(crate) detail: String,
+    pub(crate) artifacts: Option<std::path::PathBuf>,
 }
 
 pub(crate) fn compare_case(case: &ParityCase) -> ParityOutcome {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .build()
-        .expect("tokio runtime");
-    let actual = runtime.block_on(async {
-        ares_core::slice_project(
-            &case.project,
-            ares_core::GenerationMetadata::deterministic(2026, 8, 27, 0, 0, 0),
-        )
-        .await
-    });
-    if std::env::var("CLUSTER_DUMP_ACTUAL").is_ok() {
-        if let Ok(gcode) = &actual {
-            let slug = case.label.replace('/', "_");
-            let _ = std::fs::write(format!("/tmp/kobra2/{slug}_actual.gcode"), gcode);
-            let _ = std::fs::write(format!("/tmp/kobra2/{slug}_ref.gcode"), &case.reference);
-            let _ = std::fs::write(format!("/tmp/kobra2/{slug}_case.3mf"), &case.project);
-        }
-    }
-    match actual {
-        Ok(actual) => match semantic::compare_ignoring_time(&case.reference, &actual) {
-            Ok(()) => pass(&case.label),
-            Err(difference) => divergence(&case.label, difference),
-        },
-        Err(error) => ares_error(&case.label, error.to_string()),
+    artifacts::root_from_env()
+        .and_then(|root| {
+            artifacts::compare(
+                &root,
+                &case.label,
+                Ok(&case.project),
+                Ok(&case.reference),
+                serde_json::json!({"kind": "runner_cache", "producer_identity": "unknown"}),
+            )
+        })
+        .unwrap_or_else(|error| artifact_error(&case.label, error))
+}
+
+pub(crate) fn artifact_error(label: &str, error: String) -> ParityOutcome {
+    ParityOutcome {
+        label: label.to_owned(),
+        status: "ARTIFACT_ERROR",
+        detail: error,
+        artifacts: None,
     }
 }
 
@@ -71,6 +71,7 @@ pub(crate) fn pass(label: &str) -> ParityOutcome {
         label: label.to_owned(),
         status: "PASS",
         detail: String::new(),
+        artifacts: None,
     }
 }
 
@@ -79,6 +80,7 @@ pub(crate) fn divergence(label: &str, difference: String) -> ParityOutcome {
         label: label.to_owned(),
         status: "DIVERGENT",
         detail: difference,
+        artifacts: None,
     }
 }
 
@@ -87,6 +89,7 @@ pub(crate) fn ares_error(label: &str, error: String) -> ParityOutcome {
         label: label.to_owned(),
         status: "ARES_ERROR",
         detail: error,
+        artifacts: None,
     }
 }
 

@@ -1,12 +1,10 @@
-//! Cached-fixture replay sweep: re-slices every fixture 3mf captured by the
-//! full printer sweep and compares against the cached OrcaSlicer reference
-//! g-code, so the fleet moves without re-running the OrcaSlicer CLI.
-//!
-//! Gated behind `ARES_PARITY_REPLAY=<fixtures root>`.
+//! Cached project/reference replay, not a fresh Orca execution or full-output oracle.
+//! Explicit requests require ARES_PARITY_REPLAY and external ARES_PARITY_ARTIFACT_ROOT.
+use std::path::{Path, PathBuf};
 
-use std::path::PathBuf;
+use serde_json::json;
 
-use crate::{self as parity, runner::ParityCase};
+use crate::{self as parity, artifacts};
 
 struct ReplayCase {
     label: String,
@@ -14,96 +12,116 @@ struct ReplayCase {
     reference: PathBuf,
 }
 
-fn replay_one(case: &ReplayCase) -> parity::ParityOutcome {
-    let Ok(project) = std::fs::read(&case.project) else {
-        return parity::ares_error(&case.label, "fixture 3mf unreadable".into());
-    };
-    let Ok(reference) = std::fs::read(&case.reference) else {
-        return parity::ares_error(&case.label, "reference gcode unreadable".into());
-    };
-    parity::compare_case(&ParityCase {
-        label: case.label.clone(),
-        project,
-        reference,
-    })
+fn replay_one(case: &ReplayCase, root: &Path) -> parity::ParityOutcome {
+    let project = std::fs::read(&case.project)
+        .map_err(|error| format!("fixture 3mf {:?}: {error}", case.project));
+    let reference = std::fs::read(&case.reference)
+        .map_err(|error| format!("reference gcode {:?}: {error}", case.reference));
+    artifacts::compare(
+        root,
+        &case.label,
+        project.as_deref().map_err(Clone::clone),
+        reference.as_deref().map_err(Clone::clone),
+        json!({"kind": "legacy_replay", "project": case.project, "reference": case.reference}),
+    )
+    .unwrap_or_else(|error| parity::artifact_error(&case.label, error))
 }
 
 #[test]
 fn orca_parity_replay_sweep() {
-    if std::env::var("ARES_PARITY_REPLAY").is_err() {
-        eprintln!("skipping: set ARES_PARITY_REPLAY=<fixtures root>");
+    let Some(root) = std::env::var_os("ARES_PARITY_REPLAY") else {
+        eprintln!("OFFLINE SKIP: ARES_PARITY_REPLAY unset; no parity comparison executed");
         return;
-    }
-    let root: PathBuf = std::env::var("ARES_PARITY_REPLAY").unwrap().into();
-    let mut cases: Vec<ReplayCase> = Vec::new();
-    for entry in std::fs::read_dir(&root).expect("fixtures root readable") {
-        let Ok(entry) = entry else {
-            continue;
-        };
-        let path = entry.path();
+    };
+    run(&PathBuf::from(root)).unwrap_or_else(|error| panic!("replay failed: {error}"));
+}
+
+fn run(input: &Path) -> Result<(), String> {
+    let root = artifacts::root_from_env()?;
+    let mut cases = Vec::new();
+    for entry in std::fs::read_dir(input).map_err(|e| format!("{input:?}: {e}"))? {
+        let path = entry
+            .map_err(|e| format!("{input:?} directory entry: {e}"))?
+            .path();
         if path.extension().is_none_or(|extension| extension != "3mf") {
             continue;
         }
-        let reference = path
-            .parent()
-            .unwrap()
-            .join(path.file_stem().unwrap())
-            .join("plate_1.gcode");
+        let stem = path.file_stem().unwrap();
+        let label = stem
+            .to_str()
+            .ok_or_else(|| format!("non-UTF8 case label: {path:?}"))?
+            .to_owned();
         cases.push(ReplayCase {
-            label: path.file_stem().unwrap().to_string_lossy().into_owned(),
+            label,
+            reference: path.parent().unwrap().join(stem).join("plate_1.gcode"),
             project: path,
-            reference,
         });
     }
     cases.sort_by(|a, b| a.label.cmp(&b.label));
-    eprintln!("replaying {} cached fixtures", cases.len());
-
+    if cases.is_empty() {
+        return Err(format!("empty replay inventory: {input:?}"));
+    }
+    eprintln!(
+        "replaying {} cached fixtures; {}",
+        cases.len(),
+        artifacts::EVIDENCE
+    );
     let workers = std::thread::available_parallelism()
-        .map(|value| value.get())
-        .unwrap_or(4);
+        .map_or(1, |value| value.get())
+        .min(cases.len());
     let next = std::sync::atomic::AtomicUsize::new(0);
-    let outcomes: Vec<_> = std::thread::scope(|scope| {
-        let handles: Vec<_> = (0..workers)
-            .map(|_| {
-                scope.spawn(|| {
-                    let mut done = Vec::new();
-                    loop {
-                        let index = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                        let Some(case) = cases.get(index) else {
-                            return done;
-                        };
-                        let outcome = replay_one(case);
-                        if index % 100 == 0 {
-                            eprintln!("[{}/{}] {}", index, cases.len(), outcome.label);
-                        }
-                        done.push(outcome);
-                    }
-                })
-            })
-            .collect();
+    let worker = || {
+        let mut done = Vec::new();
+        loop {
+            let index = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let Some(case) = cases.get(index) else {
+                return done;
+            };
+            done.push(replay_one(case, &root));
+        }
+    };
+    let mut outcomes: Vec<_> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..workers).map(|_| scope.spawn(worker)).collect();
         handles
             .into_iter()
             .flat_map(|handle| handle.join().unwrap())
             .collect()
     });
-
-    let mut failures: Vec<_> = outcomes
-        .into_iter()
-        .filter(|outcome| outcome.status != "PASS")
-        .map(|outcome| (outcome.label, outcome.detail))
-        .collect();
-    failures.sort_by(|a, b| a.0.cmp(&b.0));
-    let passing = cases.len() - failures.len();
-
-    let report = std::path::Path::new("tests/parity/replay-summary.txt");
-    let body = failures
+    outcomes.sort_by(|a, b| a.label.cmp(&b.label));
+    let passing = outcomes
         .iter()
-        .map(|(label, detail)| format!("{label}\n{detail}\n"))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let _ = std::fs::create_dir_all(report.parent().unwrap());
-    let _ = std::fs::write(report, &body);
-
-    eprintln!("replay: {}/{} pass", passing, cases.len());
-    let _ = failures;
+        .filter(|outcome| outcome.status == "PASS")
+        .count();
+    let compared = outcomes
+        .iter()
+        .filter(|outcome| matches!(outcome.status, "PASS" | "DIVERGENT"))
+        .count();
+    let summary = json!({
+        "evidence": artifacts::EVIDENCE,
+        "input": input,
+        "inventory": cases.len(),
+        "compared": compared,
+        "passed": passing,
+        "failed": cases.len() - passing,
+        "cases": outcomes.iter().map(|outcome| json!({
+            "label": outcome.label, "status": outcome.status,
+            "detail": outcome.detail, "artifacts": outcome.artifacts,
+        })).collect::<Vec<_>>(),
+    });
+    let report = root.join("replay-summary.json");
+    artifacts::write(
+        &report,
+        &serde_json::to_vec_pretty(&summary).map_err(|e| e.to_string())?,
+    )?;
+    eprintln!(
+        "partial semantic replay: {passing}/{} passed; report {report:?}",
+        cases.len()
+    );
+    if passing != cases.len() {
+        return Err(format!(
+            "{} failed cases; NOT full-output parity; see {report:?}",
+            cases.len() - passing
+        ));
+    }
+    Ok(())
 }
