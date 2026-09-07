@@ -9572,3 +9572,17 @@ of when a block's time is finalized (GT batches by
 refresh_threshold/queue_size with entry-speed carryover). Next lever:
 mirror the refresh_threshold=queue_size batching constants exactly
 (GCodeProcessor Planner constants) in RollingPlanner.
+
+## 2026-09-07 (cont 448): inward rule verified complete; residual = Z-lift false alarm
+
+The apparent straggler (one dist-0.086324 cache entry) is the SLOPED
+layer's Z-lift (z 0.514286→0.6 = 0.085714, my float path rounds
+0.086324) — a legitimate travel GT also carries (its dump formats
+0.085714 so my grep missed it). The inward rule caught all 62
+wipe-tails; cache entry sets match GT exactly.
+The anchor's last 2 M73 placements = genuine per-entry cumulative
+differences at percent crossings (~0.1%) — the planner finalization
+timing (trapezoid recalc on batch boundaries). Next levers, in order
+of cost: (1) bilateral per-entry TIME diff to find the first entry
+where cumulative diverges and inspect the batch boundary there;
+(2) FanMover (4 machines); (3) skirt hull source.
