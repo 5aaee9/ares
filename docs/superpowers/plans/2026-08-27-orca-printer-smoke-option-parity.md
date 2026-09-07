@@ -9845,3 +9845,15 @@ the print. NEXT: instrument both micro-move emission sites (wipe
 tail in travel.rs + append_inward_move) for this fixture and locate
 which site GT's second identical line belongs to; then add the
 missing emission.
+
+Follow-up: wipe_before_external_loop = "0" in this fixture — the
+5819-5891 pre-loop wipe-inside site is OFF. So the duplicate comes
+from neither of the two known inward sites; every wipe_on_loops
+emission (GCode.cpp:6033 extrude_to_xy) lands as TWO g-code lines.
+Hypotheses: (a) the loop is extruded via extrude_path with a split
+that repeats the inward point; (b) the writer's extrude_to_xy with
+dE=0 + force flag emits move + Z/second statement; (c) the loop
+passes through process_layer twice (e.g., variable-width arachne
+outer wall rendered as two loops whose inward points coincide).
+NEXT: GT patch at GCode.cpp:5994 gate (fprintf count + loop id) to
+see whether the site fires 70 or 140 times.
