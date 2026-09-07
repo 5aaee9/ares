@@ -9672,3 +9672,21 @@ Fleet 757/987 gated-off (default); ares-core 6790/6790; smoke
 (generator filter emission, likely per print-z per object layer
 sequence including toolchanges) and emit the mover flushes at those
 boundaries; only then un-gate.
+
+## 2026-09-07 (cont 454): per-layer mover flush WORSE (743); reverted to end flush
+
+Tested the source-faithful per-layer flush (upstream
+`process_gcode(in, true)` per layer chunk, GCode.cpp:3741-3742):
+fleet 743 — 14 fan machines fail (ALL scalar-0.5 machines incl.
+4 not in the earlier scan + the 0.3-array machines lose their
+PASSes). The whole-layer-region single pass at emission end
+(previously measured 756 with 3 PASSes) is empirically closer.
+Hypothesis for the gap: my per-layer slice differs from upstream's
+chunk content — upstream chunk = cooling_buffer.process_layer
+output only, while my slice spans cooling.begin_layer marker +
+timelapse + object labels; a mid-slice boundary mismatch shifts
+flush timing. Reverted the per-layer call (single end-of-layers
+pass, still gated ARES_FAN_MOVER=1, fleet 757/987 off; ares-core
+6790/6790). The exact chunk-content alignment needs a GT-side
+FanMover instrument (patch process_gcode to dump chunk lengths)
+before more wiring attempts.

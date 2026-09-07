@@ -433,7 +433,6 @@ pub(super) fn emit(
                 },
             );
             cooling.finish_layer(&mut output, layer_output_start);
-            fan_mover_layer(&mut fan_mover_handle, &mut output, layer_output_start);
         }
     }
     let emitted_layer_count = header::finalize_layer_count(&mut output, tags);
@@ -533,23 +532,6 @@ pub(super) fn emit(
 /// of one source object are separate traversal objects here, but one
 /// PrintObject upstream — their islands union into one boundary. The
 /// cache holds one union per layer_index (all copies share the layout).
-/// Upstream applies FanMover per LAYER CHUNK (the tbb pipeline after the
-/// cooling filter flushes the mover buffer at every chunk boundary,
-/// `GCode.cpp:3742-3751`); the machine start g-code never passes through
-/// the mover (`GCode.cpp:3137` writes it directly).
-fn fan_mover_layer(
-    handle: &mut Option<fan_mover::FanMover>,
-    output: &mut Vec<u8>,
-    layer_start: usize,
-) {
-    let Some(mover) = handle.as_mut() else {
-        return;
-    };
-    let layer = String::from_utf8(output.split_off(layer_start)).expect("layer G-code is UTF-8");
-    let processed = mover.process_gcode(&layer, true);
-    output.extend_from_slice(processed.as_bytes());
-}
-
 fn layer_boundary_slices<'a>(
     traversal: &'a PreparedPostClassicTraversal,
     object_index: usize,
