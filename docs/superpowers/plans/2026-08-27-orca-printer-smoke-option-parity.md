@@ -9761,3 +9761,13 @@ exact bytes passed to the mover per layer (already exists as
 === POSTCOOLING === in ARES_DUMP_PRECOOLING) and diff against the
 GT chunk OUTPUT dumps (gt_fanout) line-by-line for layer 1 — the
 first divergent line localizes the mover-logic divergence.
+
+Follow-up (same turn): extracted layer-1 POSTCOOLING text vs GT
+chunk-1 mover OUTPUT: essentially IDENTICAL (2 diffs — my unresolved
+`;__ARES_ROLE_FAN_BASE__` marker that resolve_role_fans strips after
+the dump point, and a GT trailing blank). The mover INPUT is
+content-aligned; the 743 regression therefore lives INSIDE the
+mover's per-line arithmetic (likely the M106-in-buffer handling or
+front/back fan-speed bookkeeping across the flush). Next session:
+feed this exact layer-1 text through both movers (GT via a tiny
+harness call, mine via unit test) and diff the processed outputs.
