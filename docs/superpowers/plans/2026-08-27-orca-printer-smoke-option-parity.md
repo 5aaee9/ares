@@ -10016,3 +10016,23 @@ NEXT: trace state.x/y updates around start_travel (line ~70/91);
 find why the 70 wall-loop travels' router inputs are constant;
 then make the grazing detour emit both A and B waypoints (GT
 n=2 intersections 1 unit apart; my n=2 but waypoints far away).
+
+## 2026-09-07 (cont 472): waypoint frames reconciled — deficit = 1 vertex waypoint
+
+PLAN dump (plan_route, gcode mm): my 70 wall travels =
+from (164.670,179.640) to (164.890,179.890) with waypoints
+(164.715,179.640) [entry] and (164.715,179.715) [exit]. Router
+frame reconciled: scale 1e6/mm with offset (160,175) — the 70 AP
+lines ARE these travels; waypoints (4714977,4640002),
+(4715006,4715006). GT (converted to my frame): entry 4714977 ✓
+match, vertex 4715000 (get_polygon_vertex_offset — MISSING in
+mine), exit 4715100 (mine=4715006, 94 units off). My `around`
+walk emitted 0 vertices (my two intersections on the SAME segment;
+GT's on ADJACENT segments → 1 vertex). My boundary corner near the
+graze = (4715077,4715077); GT's implied corner ≈4714929 — contour
+differs ~148nm at the corner (inner_offset rounding). bnddump
+first build patched the 2-arg init_boundary (:1201, never called);
+2nd build patches the 3-arg (:1215) actually used by travel_to.
+NEXT: diff GT vs my contour vertices at the graze corner → fix
+inner_offset rounding (clipper) → both the missing vertex and the
+94-unit exit shift resolve → fleet +20.
