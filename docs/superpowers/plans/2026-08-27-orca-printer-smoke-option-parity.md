@@ -9601,3 +9601,25 @@ travel-geometry/deposition. The wipe clip sites already use the
 upstream formula; the ±1 comes from the input vertex (route/geometry
 stage). Remaining big levers: FanMover (4 machines, known 62-line
 diffs), skirt hull source, and the ±1 vertex class at its origin.
+
+## 2026-09-07 (cont 450): FanMover port scoped (next full turn)
+
+Wiring state verified: `gcode_role_fan.rs` (kickstart state machine)
+exists only in the LEGACY gcode.rs path; the project_slice path
+(cooling.rs resolve_role_fans + part-fan marker) emits the 63
+force-M106s that FanMover collapses to 5 on the 4
+fan_speedup_time>0 machines. Port plan (entry points mapped):
+- FanMover.hpp:63-68 ctor semantics: nb_seconds_delay =
+  max(0.01, fan_speedup_time) when >0; kickstart from
+  machine fan_kickstart; only_overhangs = fan_speedup_overhangs.
+- process_gcode(gcode, flush) parses per line; G1/G0 accumulate
+  dist/current_speed into buffer time (FanMover.cpp:297-305);
+  M106 fan_speed>buffer-front triggers the delayed/kickstart
+  insertion path (:317-378); _remove_slow_fan erases queued slower
+  commands (:214); _print_in_middle_G1 splices a fan command into a
+  motion line at a partial time offset (:171).
+- Wire as a post-pass over the emitted layer gcode in gcode_emit
+  (same site family as the cooling rewrite), gated on
+  fan_speedup_time != 0 || fan_kickstart > 0 (GCode.cpp:3731).
+Fixture count: 4/991 machines. Verify: anchor 0e56ebfb fan lines
+63→5 and fleet replay no-regression.
