@@ -9857,3 +9857,19 @@ passes through process_layer twice (e.g., variable-width arachne
 outer wall rendered as two loops whose inward points coincide).
 NEXT: GT patch at GCode.cpp:5994 gate (fprintf count + loop id) to
 see whether the site fires 70 or 140 times.
+
+## 2026-09-07 (cont 464): inward site fires 284×, 140 lines survive
+
+inwarddump.patch (result-inwarddump, ORCA_DUMP_INWARD): the
+GCode.cpp:5994 gate site fires 284 times on anchor 02815e7 —
+exactly 2× per emitted inward line (140 lines in GT = 70 pairs).
+The fprintf sits BEFORE the gate, so 284 = total extrude_loop calls
+(~142 qualifying loops × 2 calls each + inner walls failing the
+gate). CONCLUSION: extrude_loop runs TWICE per qualifying loop
+while the wall extrusion lines stay single — the second call is not
+a full re-extrusion; it likely serves the seam re-approach /
+variable-width arachne second pass and emits only the inward move
+again (no wall output). NEXT: extend the GT patch to dump paths
+count + total path length per extrude_loop call — the call with
+identical inward point but different path structure identifies the
+caller (extrude_entity collection re-entry vs loop-level emission).
