@@ -8,6 +8,7 @@ use crate::project_slice::{
 mod brim;
 mod cooling;
 mod expression;
+mod fan_mover;
 mod file_start;
 mod finish;
 pub(super) mod footprint;
@@ -500,6 +501,35 @@ pub(super) fn emit(
 /// of one source object are separate traversal objects here, but one
 /// PrintObject upstream — their islands union into one boundary. The
 /// cache holds one union per layer_index (all copies share the layout).
+fn apply_fan_mover(output: &mut Vec<u8>, traversal: &PreparedPostClassicTraversal) {
+    let gcode = &traversal.resolved.views.full.printer.gcode;
+    let speedup_time = gcode.fan_speedup_time.0;
+    let kickstart = gcode.fan_kickstart.0;
+    if speedup_time == 0.0 && kickstart <= 0.0 {
+        return;
+    }
+    let relative_e = traversal
+        .resolved
+        .views
+        .full
+        .printer
+        .gcode
+        .use_relative_e_distances
+        .0;
+    let only_overhangs = gcode.fan_speedup_overhangs.0;
+    let flavor = gcode.gcode_flavor;
+    let mut mover = fan_mover::FanMover::new(
+        speedup_time,
+        kickstart,
+        only_overhangs,
+        relative_e,
+        flavor,
+    );
+    let text = String::from_utf8(std::mem::take(output)).expect("generated G-code is UTF-8");
+    let rewritten = mover.process_gcode(&text, true);
+    *output = rewritten.into_bytes();
+}
+
 fn layer_boundary_slices<'a>(
     traversal: &'a PreparedPostClassicTraversal,
     object_index: usize,
