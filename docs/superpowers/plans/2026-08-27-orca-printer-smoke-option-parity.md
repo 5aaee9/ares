@@ -9905,3 +9905,16 @@ approach. NEXT: extend the dump to print the computed pt coords at
 the 5994 site — if both 179.715 lines come from THIS site (71
 fires ≈ 70 loops but 140 lines?), then each pass emits two lines
 (writer-level duplicate inside extrude_to_xy with dE=0 + force).
+
+## 2026-09-07 (cont 467): refined hypothesis — pair = dE-0 wipe tail + inward move
+
+The 71 role=2 gate passes cannot produce 140 lines (one extrude_to_xy
+each). Refined reading of the GT pair (travel → 179.715 → 179.715 →
+164.89 → +13 lines → WIPE_START): the FIRST 179.715 is a dE-0 WIPE
+TAIL move (wipe continues after the retract is consumed; pure-XY
+wipe segment) and the SECOND is the wipe_on_loops inward move. My
+port emits the inward move only — my wipe path likely stops one
+segment earlier (retract consumed → tail dropped) or rounds it
+differently. NEXT: extract my wipe segment list for this exact
+loop (wipe_moves state on anchor 02815e7 layer 1 outer wall) and
+count pure-XY tail moves; the missing segment lands at 179.715.
