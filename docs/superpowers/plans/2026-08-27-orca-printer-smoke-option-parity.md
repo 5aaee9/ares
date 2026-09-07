@@ -9729,3 +9729,19 @@ GT chunk lens, anchor 0e56eb):
 NEXT: dump the GT mover's per-chunk OUTPUT (patch after flush to
 write the processed chunk itself) and align against my slices
 directly — comparing consumed sizes alone cannot resolve the unit.
+
+## 2026-09-07 (cont 457): chunk-output instrument — chunk 1 IS layer 1 (prefix hypothesis retracted)
+
+fanchunk2.patch (result-fanchunk2, ORCA_DUMP_FANOUT): dumps every
+processed chunk. Anchor 0e56eb: chunk-1 OUTPUT begins with
+;LAYER_CHANGE;Z:0.2 — chunk 1 = LAYER 1 starting at the first
+marker (the 1860==prefix equality in cont 456 was a coincidence;
+retracted). Chunk-2 output begins with the mover-inserted `M106 S255`
+then layer 2's marker — the mover's own insertions change subsequent
+chunk boundaries, explaining why marker→marker spans (1875) ≠ chunk
+sizes (1860/2730). True mapping: chunk N = ;LAYER_CHANGE(N) .. just
+before ;LAYER_CHANGE(N+1), with mover-emitted lines counted inside
+the chunk where they land. NEXT: align my per-layer slice to start
+exactly at ;LAYER_CHANGE (currently starts at the
+;__ARES_PART_FAN_STATE__ marker line before it) and re-run the
+per-layer flush comparison.
