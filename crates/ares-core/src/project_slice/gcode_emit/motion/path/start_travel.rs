@@ -396,6 +396,7 @@ fn plan_route(
     first_x: f64,
     first_y: f64,
 ) -> Vec<arc::Point> {
+    let dump = std::env::var_os("ARES_DUMP_PLAN").is_some();
     // Upstream gates routing on `is_current_position_clear()`
     // (`GCode.cpp:7420`); the rectangle shell keeps its layer gate so the
     // dormant default matches the previously verified output.
@@ -461,6 +462,24 @@ fn plan_route(
         y: first_y,
     });
     route_dedup(&mut route);
+    if dump {
+        use std::io::Write;
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/ksm/my_plan.txt")
+        {
+            let _ = write!(
+                file,
+                "PLAN feat={feature} from=({:.3},{:.3}) to=({first_x:.3},{first_y:.3})",
+                state.x, state.y
+            );
+            for point in &route {
+                let _ = write!(file, " ({:.3},{:.3})", point.x, point.y);
+            }
+            let _ = writeln!(file);
+        }
+    }
     route
 }
 
