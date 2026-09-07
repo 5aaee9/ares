@@ -9873,3 +9873,17 @@ again (no wall output). NEXT: extend the GT patch to dump paths
 count + total path length per extrude_loop call — the call with
 identical inward point but different path structure identifies the
 caller (extrude_entity collection re-entry vs loop-level emission).
+
+## 2026-09-07 (cont 465): wall count 70=70 — second extrude_loop is WALL-LESS
+
+Decisive cross-check on anchor 02815e7: the wall extrusion line
+`G1 X155.11 Y179.89 E.10273` appears exactly **70 times in BOTH**
+GT and mine — the wall output is single. So the second extrude_loop
+call per loop (284 calls / 140 gate passes) emits ONLY the inward
+move and NO wall lines: its paths are clipped/discarded (seam_gap
+clipping "discard null polyline" path or force_no_extrusion) while
+the wipe_on_loops gate at :5994 still passes on the pre-clip paths.
+NEXT: extend the GT site patch to also print paths.size() and each
+path's point count — the wall-less call will show size>0 but
+clipped-to-empty content; locate the caller emitting that second
+loop (likely the seam re-approach fake loop).
