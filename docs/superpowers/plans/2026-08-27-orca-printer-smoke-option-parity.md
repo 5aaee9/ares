@@ -9938,3 +9938,14 @@ NEXT: read upstream extrude_loop's enable_seam_slope block
 (GCode.cpp:5776-5810 + scarf emission) for a second wipe_on_loops
 pass over scarf paths; port the double emission; verify anchor
 02815e7 (70 pairs) + fleet.
+
+## 2026-09-07 (cont 468): wipe_before_external_loop=0 confirmed; pair source still open
+
+Re-verified: wipe_before_external_loop="0" in the 3mf — the 5819
+pre-seam site cannot fire. The two 179.715 moves sit between the
+travel and the seam point (164.89/179.89 where wall E starts);
+neither wipe_on_loops (loop END) nor wipe_before_external_loop
+(disabled) explains BOTH. Cheapest decisive probe for next turn:
+patch GCodeWriter::extrude_to_xy to fprintf a marker for dE==0
+calls — the two lines' call sites (inward vs other) will be
+labeled directly in emission order.
