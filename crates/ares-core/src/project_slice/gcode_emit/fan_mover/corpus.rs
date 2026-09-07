@@ -11,7 +11,7 @@ use crate::GCodeFlavor;
 ///    when the later S255 arrives),
 /// 2. my `M106 S255` prints mid-layer where GT delays it into chunk 2.
 #[test]
-#[ignore = "corpus inputs differ from GT mover inputs by the wipe-tail ±1 class"]
+
 fn layer_corpus_matches_gt_chunk_outputs() {
     let layers: [&str; 2] = [
         include_str!("corpus_layer1.txt"),

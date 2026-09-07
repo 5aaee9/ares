@@ -109,8 +109,11 @@ impl FanMover {
             flavor,
             buffer: Vec::new(),
             buffer_time_size: 0.0,
-            front_buffer_fan_speed: -1,
-            back_buffer_fan_speed: -1,
+            // FanMover.hpp:51-52: both buffer fan speeds start at 0 (the
+            // initial state IS "fan off"), so a chunk-leading `M106 S0`
+            // with speed == front speed is suppressed at flush.
+            front_buffer_fan_speed: 0,
+            back_buffer_fan_speed: 0,
             current_kickstart: None,
             current_kickstart_raw: String::new(),
             current_speed: 0.0,

@@ -9794,3 +9794,19 @@ by finish_layer stages), GT chunk-2 output has the mover-inserted
 M106 S255 at head. The mover test corpus must use MY FINAL layer
 texts (slice the gated-off gcode by ;LAYER_CHANGE) so the mover sees
 the same M106 population upstream's did.
+
+## 2026-09-07 (cont 460): FanMover front/back init = 0; corpus GREEN; mover un-gated
+
+fanchunk3.patch (result-fanchunk3, ORCA_DUMP_FANIN): GT mover chunk
+INPUT texts. Exact-input corpus (gin1/gin2) replaced my ±1-polluted
+corpus inputs. Single remaining divergence: my chunk-1 output kept
+the leading `M106 S0` while GT drops it. ROOT CAUSE:
+FanMover.hpp:51-52 — m_front/m_back_buffer_fan_speed initialize to
+0 (not -1); a chunk-leading S0 equals the front speed → suppressed
+at flush. Fixed the init; the corpus test now PASSES un-ignored
+(both layers byte-exact vs GT chunk outputs).
+Mover un-gated (always on for speedup≠0 || kickstart>0): fleet
+steady 757/987 with the failing set IDENTICAL to baseline (0
+delta) — the 10 fan machines still fail on the OTHER classes
+(wipe-tail ±1, M73 placement), but the fan-spam component (63→5
+M106s) is now source-faithful.

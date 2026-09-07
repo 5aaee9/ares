@@ -1,3 +1,4 @@
+M106 S0
 ;LAYER_CHANGE
 ;Z:0.2
 ;HEIGHT:0.2
@@ -82,4 +83,4 @@ G1 X159.923 Y103.3 E.08039
 G1 X159.251 Y103.3 E.03124
 G1 X158.494 Y102.543 E.04974
 ; stop printing object cube10.stl id:0 copy 0
-M106 S255
+
