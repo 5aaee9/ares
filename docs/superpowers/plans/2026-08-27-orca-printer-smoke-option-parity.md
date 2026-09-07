@@ -9968,3 +9968,22 @@ pathdump missed these because its site is in extrude_path (:6106),
 not on the direct _extrude calls. NEXT: slopedump build running
 (prints per-path first/last/n/slope after clip_slope) → diff my
 scarf::build fragmentation → fix scarf.rs → unlock 20 cases.
+
+## 2026-09-07 (cont 470): deposition-17 FINAL mechanism — avoid-crossing detour micro-waypoint
+
+plaindump (result-plaindump): all 284 wall loops have paths=1 after
+clip_end — the loop itself emits ONE travel. The 3 commented
+"move to first perimeter point" TRAVXYs (A, B, C) are the LEGS of
+ONE GCode::travel_to call: `travel` polyline = [.., (164.715,
+179.64), A=(164.7150,179.7150), B=(164.7151,179.7151), C=(164.89,
+179.89)] — an avoid_crossing_perimeters DETOUR with z=DBL_MAX (so
+i==1 leg → travel_to_xyz lift [the F7200 line], middle+last legs →
+travel_to_xy with comment). GT's detour carries micro-waypoints A
+AND B (1 unit apart); mine carries only A then C — my router drops/
+merges the 1-unit leg B. 70 pairs = 70 detours with a 1-unit leg.
+Same ±1-unit vertex family as the wipe-tail class (boundary-derived
+waypoint). NEXT: ARES_DUMP on my avoid_crossing router for this
+travel; compare boundary intersection output; fix the 1-unit leg
+emission (upstream keeps both legs because the detour polyline
+comes from Clipper intersection with the hull). Scarf is NOT
+involved (enable_seam_slope false; slopedump produced no output).
