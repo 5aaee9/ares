@@ -9771,3 +9771,18 @@ mover's per-line arithmetic (likely the M106-in-buffer handling or
 front/back fan-speed bookkeeping across the flush). Next session:
 feed this exact layer-1 text through both movers (GT via a tiny
 harness call, mine via unit test) and diff the processed outputs.
+
+## 2026-09-07 (cont 459): layer-2 map; POSTCOOLING dump position clarified
+
+Layer-2 comparison: GT chunk-2 mover OUTPUT begins with the
+mover-INSERTED `M106 S255` (the layer-1 fan-up delayed into the
+next chunk); my post-cooling text has NO M106 at that point — my
+fan lines are added by finish_layer's later stages (splice +
+resolve_role_fans) which run AFTER the POSTCOOLING instrument point.
+The per-layer mover wiring (reverted) ran after finish_layer and so
+did see M106s; the instrument was simply positioned mid-stage.
+Standing root cause for 743: mover arithmetic on M106-in-buffer.
+Concrete repro instrumented next: unit test feeding my exact
+post-finish layer texts through FanMover chunk-by-chunk vs the GT
+chunk outputs (gt_fanout) — the gt_pc1/gt_pc2/my_pc* fixtures in
+/tmp/ksm are ready.
