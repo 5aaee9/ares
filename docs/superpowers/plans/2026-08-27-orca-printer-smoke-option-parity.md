@@ -9638,3 +9638,19 @@ restored 757/987. NEXT: diff the 6 scalar machines' M106 placements
 vs GT under ARES_FAN_MOVER=1 (likely: scalar-string settings arrive
 via a different option path than the array values, changing delay or
 buffer behavior; or the mover's G1-split rounding at 3 decimals).
+
+## 2026-09-07 (cont 452): print_in_middle time fix; mover 3-fan-fix vs 4-scalar-break map
+
+Landed: print_in_middle always subtracts the consumed front's FULL
+time from buffer_time_size (upstream remove_from_buffer; my
+conditional subtract was wrong). With that fix the mover-on fleet =
+756 (net −1): fixes 0e56/33a4/6ab2 (three fan machines flip PASS)
+but breaks four scalar-delay machines (27776/4082/6353/af79/c628
+were baseline semantic-PASS with M73-only raw diffs; mover ON drops
+one `M106 S0` (line ~30, initial fan-off) that GT keeps — a
+buffer-window flush timing / remove_slow_fan interaction). Gated
+inert (ARES_FAN_MOVER=1); fleet 757/987. NEXT: the S0 deletion —
+diff the mover-on trace for 27776 line-by-line vs a GT FanMover
+instrument (patch FanMover.cpp process_gcode flush), align the
+zero-time line buffering (M73/comments at time=0 keep the front
+alive) and the T-command flush.

@@ -447,27 +447,21 @@ impl FanMover {
     /// `_print_in_middle_G1` (FanMover.cpp:171-212): flush the front line
     /// (optionally split) with the fan command inside.
     fn print_in_middle(&mut self, index: usize, nb_sec: f32, fan_line: &str) {
-        let item = self.buffer[index].clone();
-        self.buffer_time_size -= if nb_sec < item.time * 0.1 {
-            0.0
-        } else {
-            item.time
-        };
+        let item = self.buffer.remove(index);
+        self.buffer_time_size -= item.time;
         if nb_sec < item.time * 0.1 {
             self.output.push_str(&item.raw);
             self.output.push('\n');
             self.output.push_str(fan_line);
             self.output.push('\n');
-            self.buffer.remove(index);
         } else if nb_sec > item.time * 0.9 || !item.raw.starts_with("G1 ") {
             self.output.push_str(fan_line);
             self.output.push('\n');
             self.output.push_str(&item.raw);
             self.output.push('\n');
-            self.buffer.remove(index);
         } else {
             let percent = nb_sec / item.time;
-            let mut item = self.buffer.remove(index);
+            let mut item = item;
             let (before, after) = split_line(&mut item, percent, self.relative_e);
             self.output.push_str(&before);
             self.output.push('\n');
