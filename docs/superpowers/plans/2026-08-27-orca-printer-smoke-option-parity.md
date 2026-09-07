@@ -9547,3 +9547,18 @@ streams appear inconsistent (push#800 vs P#881 offsets don't
 reconcile with the 189 filtered). Next turn: ONE nix build carrying
 BOTH patches (linedump + mtypedump) and re-diff in a single run
 before drawing further conclusions.
+
+## 2026-09-07 (cont 447): inward moves carry no cache entry (single-build verified)
+
+Single combo build (result-combo: linedump+mtypedump patches in one
+run) eliminated the cross-build doubt. Clean counts on anchor
+0845f329: 2727 processed G1s; 2476 cache pushes; the 251 unpushed =
+62 Retract + 127 Unretract (the :487 type filter) + **62 Travel —
+ALL with the identical wipe-tail delta e=[-0.077,0.039]** (one per
+layer: the `G1 X204.523 Y204.579` pre-;WIPE_START inward move).
+The static mechanism stayed invisible, but the empirical rule is
+exact.
+Landed: MotionKind::InwardMove — G0/G1 blocks whose next line is
+;WIPE_START keep their time but get no g1_times_cache entry.
+Fleet steady 757/987; the anchor's M73 diffs moved (now P0 R10 vs
+R11 + M20x ordering — the total drifted ~30s; see next).

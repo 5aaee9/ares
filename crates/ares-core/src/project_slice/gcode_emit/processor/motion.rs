@@ -59,6 +59,9 @@ pub(super) enum MotionKind {
     Regular,
     Unretract,
     ToolChange,
+    /// The pre-wipe inward move: carries time but no g1_times_cache entry
+    /// upstream (bilateral dump finding).
+    InwardMove,
 }
 
 pub(super) struct MotionBlock {

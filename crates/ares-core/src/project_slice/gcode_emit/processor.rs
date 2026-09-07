@@ -249,7 +249,20 @@ impl Estimate {
             }
             let arc_internal = matches!(command, "G2" | "G3")
                 .then(|| arc_internal_g1_lines(code, command, &state));
-            let motion_blocks = state.motions(code);
+            let mut motion_blocks = state.motions(code);
+            // The G1 immediately preceding ;WIPE_START is the pre-wipe
+            // inward move — upstream keeps its time but drops its cache
+            // entry.
+            let inward_next = lines
+                .get(index + 1)
+                .is_some_and(|next| next.trim_start().starts_with(";WIPE_START"));
+            if inward_next {
+                for block in &mut motion_blocks {
+                    if !block.e_only {
+                        block.kind = MotionKind::InwardMove;
+                    }
+                }
+            }
             match command {
                 "G0" | "G1" | "G28" => {
                     g1_line_id += 1;
@@ -313,12 +326,21 @@ impl Estimate {
             .into_iter()
             .zip(&times)
             .zip(blocks.iter().map(|block| block.e_only))
-            .filter_map(|((id, time), e_only)| {
+            .zip(
+                blocks
+                    .iter()
+                    .map(|block| block.kind == MotionKind::InwardMove),
+            )
+            .filter_map(|(((id, time), e_only), inward)| {
                 cumulative += time;
                 // E-only moves time into the total but get no g1_times_cache
                 // entry, so M73 emission skips retract/unretract lines
-                // (mirrors the GT dump behavior).
-                (!e_only).then_some((id, cumulative))
+                // (mirrors the GT dump behavior). The pre-wipe inward move
+                // also gets no cache entry upstream (verified via the
+                // ORCA_DUMP_LINES/ORCA_DUMP_MTYPE bilateral dumps: all 62
+                // wipe-tail travels vanish from the g1_times_cache while
+                // their time still counts).
+                (!e_only && !inward).then_some((id, cumulative))
             })
             .collect::<Vec<_>>();
         let mut elapsed = vec![None; lines.len() + 1];
