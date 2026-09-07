@@ -9810,3 +9810,14 @@ steady 757/987 with the failing set IDENTICAL to baseline (0
 delta) — the 10 fan machines still fail on the OTHER classes
 (wipe-tail ±1, M73 placement), but the fan-spam component (63→5
 M106s) is now source-faithful.
+
+## 2026-09-07 (cont 461): FanMover LIVE — fleet 757 → 764/987 (+7)
+
+The ARES_FAN_MOVER env filter had survived the un-gate commit
+(6ef85f61 left the mover construct-only-when-env); removing it put
+the mover LIVE for all speedup≠0 || kickstart>0 machines. Fleet:
+**757 → 764/987** — 8 fan machines flip PASS (0e56eb, 33a497,
+48f69, 51a11, 612e8, 6ab23, 7d45b, 914f6), 1 regression
+(80fb75, the near-clean kickstart=0 machine — was byte-clean except
+timestamp; mover-on shifted one line). Anchor 0e56 raw diffs 153→90.
+ares-core 6791/6791; smoke 81/82.

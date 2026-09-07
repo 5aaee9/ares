@@ -144,24 +144,21 @@ pub(super) fn emit(
     let mut layer_boundary_cache: std::collections::HashMap<usize, std::rc::Rc<[ExPolygon]>> =
         std::collections::HashMap::new();
     // FanMover construction mirrors GCode.cpp:3727-3740 (gate:
-    // fan_speedup_time != 0 || fan_kickstart > 0); ARES_FAN_MOVER=1
-    // opts in while the port remains GT-verification-gated.
+    // fan_speedup_time != 0 || fan_kickstart > 0).
     let fan_mover_gate = (|| {
         let gcode = &traversal.resolved.views.full.printer.gcode;
         let speedup_time = gcode.fan_speedup_time.0;
         let kickstart = gcode.fan_kickstart.0;
-        (speedup_time != 0.0 || kickstart > 0.0)
-            .then(|| {
-                let relative_e = gcode.use_relative_e_distances.0;
-                fan_mover::FanMover::new(
-                    speedup_time,
-                    kickstart,
-                    gcode.fan_speedup_overhangs.0,
-                    relative_e,
-                    gcode.gcode_flavor,
-                )
-            })
-            .filter(|_| std::env::var("ARES_FAN_MOVER").is_ok())
+        (speedup_time != 0.0 || kickstart > 0.0).then(|| {
+            let relative_e = gcode.use_relative_e_distances.0;
+            fan_mover::FanMover::new(
+                speedup_time,
+                kickstart,
+                gcode.fan_speedup_overhangs.0,
+                relative_e,
+                gcode.gcode_flavor,
+            )
+        })
     })();
     let mut fan_mover_handle = fan_mover_gate;
     let fan_layers_start = output.len();
