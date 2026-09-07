@@ -328,6 +328,7 @@ impl FanMover {
                     self.buffer.remove(0);
                 } else {
                     self.output.push_str(&set_fan_line(100));
+                    self.output.push('\n');
                 }
                 let kickstart_duration =
                     self.kickstart * f32::from(fan_speed - self.front_buffer_fan_speed) / 100.0;
