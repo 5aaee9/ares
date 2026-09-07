@@ -9562,3 +9562,13 @@ Landed: MotionKind::InwardMove — G0/G1 blocks whose next line is
 ;WIPE_START keep their time but get no g1_times_cache entry.
 Fleet steady 757/987; the anchor's M73 diffs moved (now P0 R10 vs
 R11 + M20x ordering — the total drifted ~30s; see next).
+
+Post-inward-fix state: anchor 0845f329 down to 4 real diff lines (2
+M73 placements, same values, one line apart). My cache entry SET now
+exactly matches GT's (2476 = 2476 after the inward drop). The
+residual = per-entry CUMULATIVE values differ slightly (~0.1%) at
+the percent-crossing boundary — the planner retention/flush timing
+of when a block's time is finalized (GT batches by
+refresh_threshold/queue_size with entry-speed carryover). Next lever:
+mirror the refresh_threshold=queue_size batching constants exactly
+(GCodeProcessor Planner constants) in RollingPlanner.
