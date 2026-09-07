@@ -43,3 +43,13 @@ fn fan_speedup_control_rejects_invalid_values() {
         assert!(err.to_string().contains(key));
     }
 }
+
+#[test]
+fn project_settings_route_fan_speedup_time_into_printer_gcode() {
+    let settings: crate::ProjectSettings = serde_json::from_value(json!({
+        "fan_speedup_time": "0.3", "fan_kickstart": "0.5"
+    }))
+    .unwrap();
+    assert_eq!(settings.printer.gcode.fan_speedup_time.0, 0.3);
+    assert_eq!(settings.printer.gcode.fan_kickstart.0, 0.5);
+}

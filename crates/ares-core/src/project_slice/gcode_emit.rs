@@ -439,6 +439,7 @@ pub(super) fn emit(
         emitted_layer_count,
     );
     output.push(b'\n');
+    apply_fan_mover(&mut output, traversal);
     Ok(processor::process(
         output,
         !traversal.resolved.views.full.printer.gcode.disable_m73.0,
@@ -505,7 +506,11 @@ fn apply_fan_mover(output: &mut Vec<u8>, traversal: &PreparedPostClassicTraversa
     let gcode = &traversal.resolved.views.full.printer.gcode;
     let speedup_time = gcode.fan_speedup_time.0;
     let kickstart = gcode.fan_kickstart.0;
-    if speedup_time == 0.0 && kickstart <= 0.0 {
+    // INERT GATE: the port is unit-tested but not yet GT-verified — the
+    // four "0.3"-array machines improved (0e56 153→90 raw lines) while the
+    // six scalar-0.5/0.2 machines regressed (5025 156→174). Enable only
+    // after the mover matches GT on all ten fan machines.
+    if speedup_time <= 0.0 || !std::env::var("ARES_FAN_MOVER").is_ok() {
         return;
     }
     let relative_e = traversal
@@ -518,13 +523,8 @@ fn apply_fan_mover(output: &mut Vec<u8>, traversal: &PreparedPostClassicTraversa
         .0;
     let only_overhangs = gcode.fan_speedup_overhangs.0;
     let flavor = gcode.gcode_flavor;
-    let mut mover = fan_mover::FanMover::new(
-        speedup_time,
-        kickstart,
-        only_overhangs,
-        relative_e,
-        flavor,
-    );
+    let mut mover =
+        fan_mover::FanMover::new(speedup_time, kickstart, only_overhangs, relative_e, flavor);
     let text = String::from_utf8(std::mem::take(output)).expect("generated G-code is UTF-8");
     let rewritten = mover.process_gcode(&text, true);
     *output = rewritten.into_bytes();

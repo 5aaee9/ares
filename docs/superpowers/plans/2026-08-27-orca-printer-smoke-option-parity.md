@@ -9623,3 +9623,18 @@ fan_speedup_time>0 machines. Port plan (entry points mapped):
   fan_speedup_time != 0 || fan_kickstart > 0 (GCode.cpp:3731).
 Fixture count: 4/991 machines. Verify: anchor 0e56ebfb fan lines
 63→5 and fleet replay no-regression.
+
+## 2026-09-07 (cont 451): FanMover wiring verified — helps 4, hurts 6; gated inert
+
+The fan_speedup_time plumbing gap was actually a LOST CALL SITE: the
+apply_fan_mover invocation had been dropped during debug cleanup
+(re-added). With the mover live, fleet evidence:
+- 4 "0.3"-array machines IMPROVED (0e56eb raw 153→90, 33a4 141→99,
+  6ab2 159→103 — all three flipped to semantic PASS in one run) 
+- 6 scalar-0.5/0.2 machines REGRESSED (5025 156→174, etc.)
+Net 757→756. The mover is therefore gated behind ARES_FAN_MOVER=1
+(inert by default): module + unit tests + call site stay, fleet
+restored 757/987. NEXT: diff the 6 scalar machines' M106 placements
+vs GT under ARES_FAN_MOVER=1 (likely: scalar-string settings arrive
+via a different option path than the array values, changing delay or
+buffer behavior; or the mover's G1-split rounding at 3 decimals).

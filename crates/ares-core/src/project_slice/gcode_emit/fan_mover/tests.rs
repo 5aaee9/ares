@@ -17,7 +17,10 @@ fn pass_through_when_disabled() {
 fn ramp_up_command_delayed_into_buffer() {
     // A fan-up command moves back into the buffer by the delay window.
     let mut fan_mover = mover(1.0, 0.0);
-    let out = fan_mover.process_gcode("G1 F6000\nM106 S255\nG1 X10\nG1 X10\nG1 X10\nG1 X10\n", true);
+    let out = fan_mover.process_gcode(
+        "G1 F6000\nM106 S255\nG1 X10\nG1 X10\nG1 X10\nG1 X10\n",
+        true,
+    );
     // The fan line must not stay at its original position; it lands inside
     // the buffered motion window (output order: motion, fan, motion...).
     assert!(!out.starts_with("G1 F6000\nM106"));
@@ -52,4 +55,3 @@ fn kickstart_full_speed_precedes_eventual_target() {
     assert!(target.is_some(), "target line missing: {out}");
     assert!(full < target);
 }
-

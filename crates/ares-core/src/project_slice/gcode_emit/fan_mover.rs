@@ -256,7 +256,10 @@ impl FanMover {
                     e
                 };
             }
-            self.push_buffer(BufferData::new(raw.to_owned(), time, fan_speed, false), &motion);
+            self.push_buffer(
+                BufferData::new(raw.to_owned(), time, fan_speed, false),
+                &motion,
+            );
             if let Some(mut kick) = self.current_kickstart {
                 if time > 0.0 {
                     kick.time -= time;
@@ -315,8 +318,7 @@ impl FanMover {
                 self.remove_slow_fan(fan_speed, self.buffer_time_size + 1.0);
                 self.remove_slow_fan(255, self.kickstart);
                 if !self.buffer.is_empty()
-                    && (self.buffer_time_size - self.buffer[0].time * 0.1)
-                        > self.nb_seconds_delay
+                    && (self.buffer_time_size - self.buffer[0].time * 0.1) > self.nb_seconds_delay
                 {
                     self.print_in_middle(
                         0,
@@ -334,8 +336,7 @@ impl FanMover {
                 while index < self.buffer.len() && time_count > 0.0 {
                     time_count -= self.buffer[index].time;
                     if time_count < 0.0 {
-                        let data =
-                            BufferData::new(raw.to_owned(), 0.0, fan_speed, true);
+                        let data = BufferData::new(raw.to_owned(), 0.0, fan_speed, true);
                         self.put_in_middle(index, self.buffer[index].time + time_count, data);
                         break;
                     }
@@ -352,14 +353,9 @@ impl FanMover {
             } else {
                 self.remove_slow_fan(fan_speed, self.buffer_time_size + 1.0);
                 if !self.buffer.is_empty()
-                    && (self.buffer_time_size - self.buffer[0].time * 0.1)
-                        > self.nb_seconds_delay
+                    && (self.buffer_time_size - self.buffer[0].time * 0.1) > self.nb_seconds_delay
                 {
-                    self.print_in_middle(
-                        0,
-                        self.buffer_time_size - self.nb_seconds_delay,
-                        raw,
-                    );
+                    self.print_in_middle(0, self.buffer_time_size - self.nb_seconds_delay, raw);
                     self.buffer.remove(0);
                 } else {
                     self.output.push_str(raw);
@@ -431,7 +427,8 @@ impl FanMover {
             self.buffer.insert(index, line);
         } else {
             let percent = nb_sec / item_time;
-            let (before_raw, after_raw) = split_line(&mut self.buffer[index], percent, self.relative_e);
+            let (before_raw, after_raw) =
+                split_line(&mut self.buffer[index], percent, self.relative_e);
             let before = BufferData::new(before_raw, nb_sec, -1, false);
             let after_time = item_time - nb_sec;
             self.buffer[index].raw = after_raw;
@@ -508,10 +505,7 @@ fn read_fan_speed(code: &str, flavor: GCodeFlavor) -> i16 {
     if command == "M106" {
         let p = word(code, 'P');
         if let Some(p) = p {
-            if flavor != GCodeFlavor::Mach3
-                && flavor != GCodeFlavor::Machinekit
-                && p != 1.0
-            {
+            if flavor != GCodeFlavor::Mach3 && flavor != GCodeFlavor::Machinekit && p != 1.0 {
                 return -1;
             }
         }
@@ -608,9 +602,7 @@ fn replace_word(line: &str, axis: char, value: f32, digits: usize) -> String {
         if !replaced {
             let mut characters = token.chars();
             if let Some(first) = characters.next() {
-                if first.eq_ignore_ascii_case(&axis)
-                    && characters.as_str().parse::<f32>().is_ok()
-                {
+                if first.eq_ignore_ascii_case(&axis) && characters.as_str().parse::<f32>().is_ok() {
                     result.push(first);
                     result.push_str(&format!("{value:.digits$}"));
                     replaced = true;
@@ -634,7 +626,5 @@ fn role_from_str(role: &str) -> ExtrusionRole {
 }
 
 #[cfg(test)]
-
-
 #[cfg(test)]
 mod tests;
