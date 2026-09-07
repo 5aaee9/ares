@@ -9586,3 +9586,18 @@ timing (trapezoid recalc on batch boundaries). Next levers, in order
 of cost: (1) bilateral per-entry TIME diff to find the first entry
 where cumulative diverges and inspect the batch boundary there;
 (2) FanMover (4 machines); (3) skirt hull source.
+
+## 2026-09-07 (cont 449): M73 fleet value ruled out; wipe-E traces to ±1 clip class
+
+Fleet audit: 0 of the first 76 failing cases are M73-only — M73
+placement never gates a case alone (it co-occurs with real diffs), so
+the cumulative flush-timing hunt is LOW fleet value; deprioritized.
+Filament-length family (16): anchor 011bb034's diffs are wipe
+SUB-SEGMENT E splits (GT E-.09376/.05624 vs mine -.09375/.05625 —
+same 0.15 total, 1e-5 split shift). dE = total × (seg/clipped_total):
+a ±1 scaled-unit clip-point difference on the partial segment yields
+exactly this 1e-5 — the SAME ±1 clip/vertex ulp class as
+travel-geometry/deposition. The wipe clip sites already use the
+upstream formula; the ±1 comes from the input vertex (route/geometry
+stage). Remaining big levers: FanMover (4 machines, known 62-line
+diffs), skirt hull source, and the ±1 vertex class at its origin.
