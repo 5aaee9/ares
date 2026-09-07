@@ -9987,3 +9987,13 @@ travel; compare boundary intersection output; fix the 1-unit leg
 emission (upstream keeps both legs because the detour polyline
 comes from Clipper intersection with the hull). Scarf is NOT
 involved (enable_seam_slope false; slopedump produced no output).
+
+Router tie-in (cont 470): my detour waypoints = per-vertex walk of
+the Boundary contour (middle_point_offset + around vertices in
+router.rs avoid_perimeters). GT A/B = two boundary VERTICES 1 unit
+apart; mine has one → same ±1-unit boundary-vertex family as the
+wipe-tail class. Fix locus: Boundary build (offset/union rounding)
+or middle_point_offset quantization. NEXT: dump my boundary contour
+vertices near (4775000,4775000) and compare against GT's detour
+waypoints A,B; check upstream AvoidCrossingPerimeters::travel_to
+middle_point computation for the 1-unit vertex origin.
