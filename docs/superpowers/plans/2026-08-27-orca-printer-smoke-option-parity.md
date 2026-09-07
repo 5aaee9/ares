@@ -10056,3 +10056,28 @@ perimeter_spacing; align the float pipeline (likely f32 spacing ×
 1.5 in double vs my f64 spacing) → boundary corners match → fleet
 +20 (deposition-17) and possibly the wipe-tail ±1 class (same
 width-rounding root).
+
+## 2026-09-07 (cont 474): effective routing contour 4715077 ≠ dumped init 4715068 — mystery deepens
+
+Measured chain on anchor 02815e7 (all in 1e6/mm router frame, object
+offset (160,175), input slice corner exactly (5000000,5000000)):
+- my variable_offset output (fractional offset_dis=284932.5, d0 all
+  uniform): corner 4715068 == GT init_boundary dump ✓ byte-exact.
+- GT init polygons (post-get_boundary, routing input): 4715068.
+- GT effective waypoints imply contour edge x=4715077 (entry base).
+- My ORIGINAL port (int offset_dis 284933 + trailing safety union):
+  boundary 4715077 → entry waypoint (4714977,4640002) == GT EXACT.
+- GT entry waypoint y == start.y → it is an extend_for_closest_lines
+  projection, and its base (4715077) sits 9 units OUTSIDE the dumped
+  contour — the extension/projection logic must clamp differently
+  (grid cell? closest-line search radius?) than my port.
+REVERTED both experiments (tree clean): boundary is back to int
+offset_dis + safety union (entry waypoint verified GT-exact).
+REMAINING DEFICIT: exit-class — my n=2 intersections land on the
+same segment (0 vertex waypoints); GT's on adjacent segments (1
+vertex waypoint, A then B 1 GT-unit apart) × 70 loops.
+NEXT: 7th GT instrument — dump avoid_perimeters intersections
+(border_idx, line_idx, point, do_not_remove) + result_pl for the
+wall travels; compare against my collect_intersections +
+extend_for_closest_lines to find the projection/segment-index
+divergence.
