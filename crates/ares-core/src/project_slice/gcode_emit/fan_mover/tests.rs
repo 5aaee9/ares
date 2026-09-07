@@ -53,4 +53,3 @@ fn kickstart_full_speed_precedes_eventual_target() {
     assert!(full < target);
 }
 
-#[test]
