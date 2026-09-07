@@ -9786,3 +9786,11 @@ Concrete repro instrumented next: unit test feeding my exact
 post-finish layer texts through FanMover chunk-by-chunk vs the GT
 chunk outputs (gt_fanout) — the gt_pc1/gt_pc2/my_pc* fixtures in
 /tmp/ksm are ready.
+
+Fixtures staged in /tmp/ksm for the mover-arithmetic hunt:
+mpc{1..4}.txt (my post-cooling per-layer), gpc{1..4}.txt (GT mover
+chunk outputs). Layer-2 delta: my text has 0 M106 (fans added later
+by finish_layer stages), GT chunk-2 output has the mover-inserted
+M106 S255 at head. The mover test corpus must use MY FINAL layer
+texts (slice the gated-off gcode by ;LAYER_CHANGE) so the mover sees
+the same M106 population upstream's did.
