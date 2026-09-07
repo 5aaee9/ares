@@ -9690,3 +9690,22 @@ pass, still gated ARES_FAN_MOVER=1, fleet 757/987 off; ares-core
 6790/6790). The exact chunk-content alignment needs a GT-side
 FanMover instrument (patch process_gcode to dump chunk lengths)
 before more wiring attempts.
+
+## 2026-09-07 (cont 455): GT FanMover chunk instrument built; chunk map pinned
+
+New instrument: fanchunk.patch (result-fanchunk,
+ORCA_DUMP_FANCHUNK) dumps every FanMover::process_gcode chunk
+(len, flush). Anchor 0e56eb: 62 chunks, ALL flush=1, total 95010
+bytes (file 128375 — the 33k delta = direct-written header/footer
+bypassing the mover). Chunk 1 = 1860 bytes = the first LAYER chunk
+(the start gcode prefix is byte-coincidentally also 1860; the mover
+is constructed lazily at the first chunk so the start-gcode flush at
+GCode.cpp:3165 is a no-op). Chunk boundaries fall immediately after
+each layer's last gcode line (before the next ;LAYER_CHANGE).
+My emission's layer slice (PART_FAN_MARKER → finish_layer) is close
+but the tail content differs (my M73s are inserted later in the
+processor pass — same stage; residual = pre/post marker placement).
+NEXT: map my 62 ARES_DUMP_PRECOOLING layer dumps to the GT chunk
+lens (byte-diff each pair) to find exactly which pre/post lines
+shift the boundary, then re-wire the per-layer flush at the exact
+byte offsets.
