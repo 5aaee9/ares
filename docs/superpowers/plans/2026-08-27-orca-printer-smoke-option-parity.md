@@ -9821,3 +9821,12 @@ the mover LIVE for all speedup≠0 || kickstart>0 machines. Fleet:
 (80fb75, the near-clean kickstart=0 machine — was byte-clean except
 timestamp; mover-on shifted one line). Anchor 0e56 raw diffs 153→90.
 ares-core 6791/6791; smoke 81/82.
+
+## 2026-09-07 (cont 462): mover region ends before end g-code — 766/987
+
+The end g-code bypasses the FanMover upstream (written directly
+after the pipeline); my end-pass was processing through EOF and
+ate the end g-code's `M107 ; turn off fan` (80fb75 regression).
+Fixed: fan_layers_end captured after the layer loop; the mover
+processes [fan_layers_start..fan_layers_end] only, tail re-appended
+untouched. Fleet **764 → 766/987** (80fb75 restored + one more).

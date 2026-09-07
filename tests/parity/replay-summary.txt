@@ -301,9 +301,6 @@ layer 3 deposition 1 differs: expected Deposition { feature: "Inner wall", width
 7f6892374e11ddfd-f94aadc86cd4f0df
 layer 18 deposition 17 differs: expected Deposition { feature: "Sparse infill", width: "0.22", motion: MotionRecord { command: "G1", start: Position { x: "195.871", y: "198.664", z: "2.58" }, end: Position { x: "201.336", y: "204.129", z: "2.58" }, arc_center: [None, None], turns: None }, extrusion: "0.08117", feed: 1582.0, acceleration: "2000", fans: "0:255" }, actual Deposition { feature: "Sparse infill", width: "0.22", motion: MotionRecord { command: "G1", start: Position { x: "195.871", y: "198.664", z: "2.58" }, end: Position { x: "195.871", y: "199.062", z: "2.58" }, arc_center: [None, None], turns: None }, extrusion: "0.00418", feed: 1580.0, acceleration: "2000", fans: "0:255" }
 
-80fb75f542408631-e29a09befa6deaa3
-postamble differs at line 7: expected Some("M107"), actual Some("G1 X241 Y201 F3600")
-
 81650e198420743f-3b0028188eb6f313
 reference gcode unreadable
 
@@ -392,7 +389,7 @@ a17224f9a468e61c-3acda2b2a103d852
 layer 1 travel feed differs: no match for Travel { motion: MotionRecord { command: "G1", start: Position { x: "173.4", y: "40", z: "0.2" }, end: Position { x: "91.845", y: "91.845", z: "0.2" }, arc_center: [None, None], turns: None }, feed: 11700.0, acceleration: "6000" }
 
 a1852be8385f76df-e53a3f43be40da9b
-postamble differs at line 7: expected Some("M107"), actual Some("G1 X241 Y201 F3600")
+layer 70 control events differs: expected [";BEFORE_LAYER_CHANGE", "G92 E0.0", ";8.43", "M201 X3999.48 Y3999.48", "", "M486 S-1", ";AFTER_LAYER_CHANGE", ";8.43", "M74 W0.480576", "", ";_SET_FAN_SPEED_CHANGING_LAYER", "; printing object cube10.stl id:0 copy 0", "M486 S0", "M205 X7 Y7", "M205 X8 Y8", "; stop printing object cube10.stl id:0 copy 0"], actual [";BEFORE_LAYER_CHANGE", "G92 E0.0", ";8.43", "M201 X3999.48 Y3999.48", "", "M486 S-1", ";AFTER_LAYER_CHANGE", ";8.43", "M74 W0.480575", "", ";_SET_FAN_SPEED_CHANGING_LAYER", "; printing object cube10.stl id:0 copy 0", "M486 S0", "M205 X7 Y7", "M205 X8 Y8", "; stop printing object cube10.stl id:0 copy 0"]
 
 a21f19a613745fbe-3b9508935bf6ddb0
 layer 1 travel feed differs: no match for Travel { motion: MotionRecord { command: "G1", start: Position { x: "154.46", y: "154.4", z: "0.4" }, end: Position { x: "153.589", y: "147.705", z: "0.4" }, arc_center: [None, None], turns: None }, feed: 21000.0, acceleration: "6000" }
@@ -422,7 +419,7 @@ a7a16ba2fb9be6d8-6fd40a48a03bb340
 layer 15 deposition 41 differs: expected Deposition { feature: "Sparse infill", width: "0.45", motion: MotionRecord { command: "G1", start: Position { x: "302.3", y: "304.007", z: "3" }, end: Position { x: "303.928", y: "304.007", z: "3" }, arc_center: [None, None], turns: None }, extrusion: "0.05401", feed: 1700.0, acceleration: "", fans: "0:255" }, actual Deposition { feature: "Sparse infill", width: "0.45", motion: MotionRecord { command: "G1", start: Position { x: "302.3", y: "304.007", z: "3" }, end: Position { x: "303.929", y: "304.007", z: "3" }, arc_center: [None, None], turns: None }, extrusion: "0.05401", feed: 1700.0, acceleration: "", fans: "0:255" }
 
 a7b5a9807252f69e-73cd2f997b017900
-postamble differs at line 10: expected Some("M107"), actual Some("G1 X0 Y105 F3000")
+layer 1 deposition count differs: expected 50, actual 51
 
 a861126b324f316c-b5a3f9bd1b79e7b9
 layer 1 deposition count differs: expected 342, actual 341
@@ -434,7 +431,7 @@ aa4454630cef4cf9-7eb9c057b1996c04
 reference gcode unreadable
 
 aa465fe1078d2558-ca5db34e0b8896a5
-postamble differs at line 7: expected Some("M107"), actual Some("G1 X241 Y201 F3600")
+layer 1 control events differs: expected [";BEFORE_LAYER_CHANGE", "G92 E0.0", ";0.2", "M201 X4000 Y4000", "", ";AFTER_LAYER_CHANGE", ";0.2", "M74 W-0.00238604", "", ";_SET_FAN_SPEED_CHANGING_LAYER", "M205 X7 Y7", "; printing object cube10.stl id:0 copy 0", "M205 X8 Y8", "M486 S0", "M205 X7 Y7", "M205 X8 Y8", "M205 X7 Y7", "M205 X8 Y8", "M205 X7 Y7", "M205 X8 Y8", "M205 X7 Y7", "; stop printing object cube10.stl id:0 copy 0", "M106 S255"], actual [";BEFORE_LAYER_CHANGE", "G92 E0.0", ";0.2", "M201 X4000 Y4000", "", ";AFTER_LAYER_CHANGE", ";0.2", "M74 W0", "", ";_SET_FAN_SPEED_CHANGING_LAYER", "M205 X7 Y7", "; printing object cube10.stl id:0 copy 0", "M205 X8 Y8", "M486 S0", "M205 X7 Y7", "M205 X8 Y8", "M205 X7 Y7", "M205 X8 Y8", "M205 X7 Y7", "M205 X8 Y8", "M205 X7 Y7", "; stop printing object cube10.stl id:0 copy 0", "M106 S255"]
 
 acaf79a3ee4d52ef-f31e65ab85e51a8a
 layer 2 travel geometry count differs: expected 19, actual 17
@@ -525,9 +522,6 @@ layer 1 control events differs: expected ["G92 E0", ";======== H2D Pro 20250725 
 
 cf8f20c7fa8a4ef1-a207db030b825322
 layer 3 travel geometry count differs: expected 12, actual 13
-
-d069d9b73c5d370c-d96f411aa286d81d
-postamble differs at line 7: expected Some("M107"), actual Some("G1 X241 Y201 F3600")
 
 d2fbd92160bc0183-a28172eb04bfcc86
 layer 1 control events differs: expected ["G92 E0", ";======== H2D 20250710 layer_change ========", "; layer num/total_layer_count: 1/100", "; update layer progress", "M991 S0 P0", "", ";_SET_FAN_SPEED_CHANGING_LAYER", "; printing object cube10.stl id:0 copy 0", "; start printing object, unique label id: 14", "M624 AQAAAAAAAAA=", "; stop printing object cube10.stl id:0 copy 0", "G17", "; stop printing object, unique label id: 14", "M625", ";======== H2D 20250818========", "; SKIPPABLE_START", "; SKIPTYPE: timelapse", "M622.1 S1", "", "M1002 judge_flag timelapse_record_flag", "", "M622 J1", "M993 A2 B2 C2", "M993 A0 B0 C0", "", "", "", "", "M9711 M0 E0 X177 Y233 Z0.5 S11 C10 O0 T3000", "", "", "", "M993 A3 B3 C3", "", "M623", "; SKIPPABLE_END", "", "M106 S201", "M106 P2 S191"], actual ["G92 E0", ";======== H2D 20250710 layer_change ========", "; layer num/total_layer_count: 1/100", "; update layer progress", "M991 S0 P0", "", ";_SET_FAN_SPEED_CHANGING_LAYER", "; printing object cube10.stl id:0 copy 0", "; start printing object, unique label id: 14", "M624 AQAAAAAAAAA=", "; stop printing object cube10.stl id:0 copy 0", "G17", "; stop printing object, unique label id: 14", "M625", ";======== H2D 20250818========", "; SKIPPABLE_START", "; SKIPTYPE: timelapse", "M622.1 S1", "", "M1002 judge_flag timelapse_record_flag", "", "M622 J1", "M993 A2 B2 C2", "M993 A0 B0 C0", "", "", "", "", "M9711 M0 E1 X177 Y232 Z0.5 S11 C10 O0 T3000", "", "", "", "M993 A3 B3 C3", "", "M623", "; SKIPPABLE_END", "", "M106 S201", "M106 P2 S191"]

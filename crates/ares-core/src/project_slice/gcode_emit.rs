@@ -432,6 +432,7 @@ pub(super) fn emit(
             cooling.finish_layer(&mut output, layer_output_start);
         }
     }
+    let fan_layers_end = output.len();
     let emitted_layer_count = header::finalize_layer_count(&mut output, tags);
     // The final compatible layer has no following layer marker to flush its
     // deferred retraction. Flush only retract/wipe (not a travel lift) before
@@ -462,10 +463,12 @@ pub(super) fn emit(
     // pipeline after the cooling filter, GCode.cpp:3749), never to the
     // machine start g-code; a pending buffer is flushed per chunk.
     if let Some(mover) = fan_mover_handle.as_mut() {
-        let text = String::from_utf8(output.split_off(fan_layers_start))
-            .expect("generated G-code is UTF-8");
+        let mut layers = output.split_off(fan_layers_start);
+        let tail = layers.split_off(fan_layers_end - fan_layers_start);
+        let text = String::from_utf8(layers).expect("generated G-code is UTF-8");
         let flushed = mover.process_gcode(&text, true);
-        output.extend_from_slice(flushed.as_bytes());
+        output.extend(flushed.into_bytes());
+        output.extend(tail);
     }
     Ok(processor::process(
         output,
