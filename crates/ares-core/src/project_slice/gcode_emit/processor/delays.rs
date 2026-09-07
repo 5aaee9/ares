@@ -1,4 +1,4 @@
-use super::word;
+use super::motion_util::word;
 
 pub(super) fn command_delay(code: &str) -> Option<f64> {
     if code.starts_with("M400") {

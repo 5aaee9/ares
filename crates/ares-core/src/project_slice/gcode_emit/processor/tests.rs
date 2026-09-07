@@ -1,4 +1,6 @@
-use super::{Estimate, MotionBlock, MotionState, ProcessorLimits, planned_times, process};
+use super::estimate::Estimate;
+use super::motion::{MotionBlock, MotionState, planned_times};
+use super::{ProcessorLimits, process};
 
 // The synthetic footer fixtures use the BBL placeholder set; the end-to-end
 // suite covers the compatible set via Orca parity.
