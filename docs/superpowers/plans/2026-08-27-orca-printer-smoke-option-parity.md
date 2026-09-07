@@ -9928,3 +9928,13 @@ Candidates: scarf-joint start emission (seam_slope), loop
 clip/re-approach, or the extrude-to-seam-gap staging. My port emits
 one 179.715 (correct first move); the second identical move is the
 missing emission.
+
+Scarf connection found: my single 179.715 comes from
+`append_inward_move(output, &scarf.wipe_paths, ...)` inside the
+SCARF branch of loop_paths::emit (loop start). seam_gap=15% on this
+fixture. GT's duplicate is therefore likely the scarf start
+re-stating the inward point (the extrude_loop seam-slope staging).
+NEXT: read upstream extrude_loop's enable_seam_slope block
+(GCode.cpp:5776-5810 + scarf emission) for a second wipe_on_loops
+pass over scarf paths; port the double emission; verify anchor
+02815e7 (70 pairs) + fleet.
