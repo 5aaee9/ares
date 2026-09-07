@@ -9654,3 +9654,21 @@ diff the mover-on trace for 27776 line-by-line vs a GT FanMover
 instrument (patch FanMover.cpp process_gcode flush), align the
 zero-time line buffering (M73/comments at time=0 keep the front
 alive) and the T-command flush.
+
+## 2026-09-07 (cont 453): FanMover scope corrected — layer chunks only; still gated
+
+Upstream scope pinned (GCode.cpp:3137 vs :3742-3751): the machine
+start g-code BYPASSES the mover (written directly); the mover runs
+per LAYER CHUNK after the cooling filter with flush=true at every
+chunk boundary. Restructured the wiring accordingly (per-layer
+fan_mover_layer + end flush of the layer region; start g-code never
+enters). Result with ARES_FAN_MOVER=1: 743 — WORSE than the
+whole-buffer variant (756), because my layer-chunk boundaries do
+not align with upstream's (upstream chunks by layer-tool groups /
+gcode chunking from the generator filter; my single object×layer
+loop splits differently, changing when the buffer drains).
+Fleet 757/987 gated-off (default); ares-core 6790/6790; smoke
+81/82. NEXT for the mover: identify upstream's exact chunk unit
+(generator filter emission, likely per print-z per object layer
+sequence including toolchanges) and emit the mover flushes at those
+boundaries; only then un-gate.

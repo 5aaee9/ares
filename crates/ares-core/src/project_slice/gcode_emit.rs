@@ -143,6 +143,28 @@ pub(super) fn emit(
     // layer layout, so records are matched by slice_z.
     let mut layer_boundary_cache: std::collections::HashMap<usize, std::rc::Rc<[ExPolygon]>> =
         std::collections::HashMap::new();
+    // FanMover construction mirrors GCode.cpp:3727-3740 (gate:
+    // fan_speedup_time != 0 || fan_kickstart > 0); ARES_FAN_MOVER=1
+    // opts in while the port remains GT-verification-gated.
+    let fan_mover_gate = (|| {
+        let gcode = &traversal.resolved.views.full.printer.gcode;
+        let speedup_time = gcode.fan_speedup_time.0;
+        let kickstart = gcode.fan_kickstart.0;
+        (speedup_time != 0.0 || kickstart > 0.0)
+            .then(|| {
+                let relative_e = gcode.use_relative_e_distances.0;
+                fan_mover::FanMover::new(
+                    speedup_time,
+                    kickstart,
+                    gcode.fan_speedup_overhangs.0,
+                    relative_e,
+                    gcode.gcode_flavor,
+                )
+            })
+            .filter(|_| std::env::var("ARES_FAN_MOVER").is_ok())
+    })();
+    let mut fan_mover_handle = fan_mover_gate;
+    let fan_layers_start = output.len();
     for (object_index, object) in prepared.objects.iter_mut().enumerate() {
         let labels = object::ObjectLabels::from_traversal(traversal, object_index);
         let object_layer_count = object.len();
@@ -411,6 +433,7 @@ pub(super) fn emit(
                 },
             );
             cooling.finish_layer(&mut output, layer_output_start);
+            fan_mover_layer(&mut fan_mover_handle, &mut output, layer_output_start);
         }
     }
     let emitted_layer_count = header::finalize_layer_count(&mut output, tags);
@@ -439,7 +462,15 @@ pub(super) fn emit(
         emitted_layer_count,
     );
     output.push(b'\n');
-    apply_fan_mover(&mut output, traversal);
+    // Upstream applies FanMover ONLY to layer-chunk output (the tbb
+    // pipeline after the cooling filter, GCode.cpp:3749), never to the
+    // machine start g-code; a pending buffer is flushed per chunk.
+    if let Some(mover) = fan_mover_handle.as_mut() {
+        let text = String::from_utf8(output.split_off(fan_layers_start))
+            .expect("generated G-code is UTF-8");
+        let flushed = mover.process_gcode(&text, true);
+        output.extend_from_slice(flushed.as_bytes());
+    }
     Ok(processor::process(
         output,
         !traversal.resolved.views.full.printer.gcode.disable_m73.0,
@@ -502,32 +533,21 @@ pub(super) fn emit(
 /// of one source object are separate traversal objects here, but one
 /// PrintObject upstream — their islands union into one boundary. The
 /// cache holds one union per layer_index (all copies share the layout).
-fn apply_fan_mover(output: &mut Vec<u8>, traversal: &PreparedPostClassicTraversal) {
-    let gcode = &traversal.resolved.views.full.printer.gcode;
-    let speedup_time = gcode.fan_speedup_time.0;
-    let kickstart = gcode.fan_kickstart.0;
-    // INERT GATE: the port is unit-tested but not yet GT-verified — the
-    // four "0.3"-array machines improved (0e56 153→90 raw lines) while the
-    // six scalar-0.5/0.2 machines regressed (5025 156→174). Enable only
-    // after the mover matches GT on all ten fan machines.
-    if speedup_time <= 0.0 || !std::env::var("ARES_FAN_MOVER").is_ok() {
+/// Upstream applies FanMover per LAYER CHUNK (the tbb pipeline after the
+/// cooling filter flushes the mover buffer at every chunk boundary,
+/// `GCode.cpp:3742-3751`); the machine start g-code never passes through
+/// the mover (`GCode.cpp:3137` writes it directly).
+fn fan_mover_layer(
+    handle: &mut Option<fan_mover::FanMover>,
+    output: &mut Vec<u8>,
+    layer_start: usize,
+) {
+    let Some(mover) = handle.as_mut() else {
         return;
-    }
-    let relative_e = traversal
-        .resolved
-        .views
-        .full
-        .printer
-        .gcode
-        .use_relative_e_distances
-        .0;
-    let only_overhangs = gcode.fan_speedup_overhangs.0;
-    let flavor = gcode.gcode_flavor;
-    let mut mover =
-        fan_mover::FanMover::new(speedup_time, kickstart, only_overhangs, relative_e, flavor);
-    let text = String::from_utf8(std::mem::take(output)).expect("generated G-code is UTF-8");
-    let rewritten = mover.process_gcode(&text, true);
-    *output = rewritten.into_bytes();
+    };
+    let layer = String::from_utf8(output.split_off(layer_start)).expect("layer G-code is UTF-8");
+    let processed = mover.process_gcode(&layer, true);
+    output.extend_from_slice(processed.as_bytes());
 }
 
 fn layer_boundary_slices<'a>(
