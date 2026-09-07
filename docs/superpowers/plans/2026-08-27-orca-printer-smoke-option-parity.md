@@ -10036,3 +10036,23 @@ first build patched the 2-arg init_boundary (:1201, never called);
 NEXT: diff GT vs my contour vertices at the graze corner → fix
 inner_offset rounding (clipper) → both the missing vertex and the
 94-unit exit shift resolve → fleet +20.
+
+## 2026-09-07 (cont 473): 9-unit boundary-corner delta measured — root of the ±1 family
+
+bnddump build4 (3-arg init_boundary, dump AFTER the move): GT
+internal boundary contour (70 identical 4-vertex squares) corner =
+(4715068,4715068). Mine (ARES_DUMP_BOUNDARY) = (4715077,4715077) —
+**9 units (9nm) larger**, consistently (560 vertex hits). Downstream
+effects verified: my grazing exit intersection lands exactly AT my
+corner (4715077) → both intersections same segment → around-walk
+emits 0 vertices → 1 waypoint short; GT's exit clears their corner
+by ~100 units → adjacent segments → 1 vertex waypoint + shifted
+exit = the missing G1 line × 70 loops. Effective offset distance
+difference = 9/√2 ≈ 6.4nm ⇒ my 1.5×perimeter_spacing inner-offset
+distance is ~6.4nm larger than upstream's float pipeline (flow
+spacing f32 rounding). NEXT: instrument upstream get_perimeter_
+spacing / get_boundary offset distance vs my AvoidCrossingGeometry
+perimeter_spacing; align the float pipeline (likely f32 spacing ×
+1.5 in double vs my f64 spacing) → boundary corners match → fleet
++20 (deposition-17) and possibly the wipe-tail ±1 class (same
+width-rounding root).
