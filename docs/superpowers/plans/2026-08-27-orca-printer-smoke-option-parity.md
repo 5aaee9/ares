@@ -9949,3 +9949,22 @@ neither wipe_on_loops (loop END) nor wipe_before_external_loop
 patch GCodeWriter::extrude_to_xy to fprintf a marker for dE==0
 calls — the two lines' call sites (inward vs other) will be
 labeled directly in emission order.
+
+## 2026-09-07 (cont 469): deposition-17 ROOT CAUSE FOUND — 70 one-unit path pairs
+
+etodump (result-etodump, ORCA_DUMP_ETO on extrude_to_xy/travel_to_xy):
+the "duplicate" 179.715 lines are TWO DISTINCT travel_to_xy calls,
+comment "move to first perimeter point" (_extrude per-path staging,
+GCode.cpp:6378), to points (164.7150,179.7150) and (164.7151,179.7151)
+— exactly 1 scaled unit apart diagonally. Count: 210 first-point
+travels, 70 adjacent 1-unit pairs == the 70 duplicated G1 pairs.
+GT emits the wall loop as >=3 ExtrusionPaths: two degenerate stubs
+(A, B) whose extrusion is sub-EPSILON-skipped but whose travels
+print, then the main path at (164.89,179.89). My scarf port emits
+only 2 paths (1 stub + main). The fragmentation comes from
+ExtrusionLoopSloped ctor + clip_slope (ExtrusionEntity.cpp:426-575)
+emitted via `for p in new_loop.get_all_paths()` (GCode.cpp:5956) —
+pathdump missed these because its site is in extrude_path (:6106),
+not on the direct _extrude calls. NEXT: slopedump build running
+(prints per-path first/last/n/slope after clip_slope) → diff my
+scarf::build fragmentation → fix scarf.rs → unlock 20 cases.
