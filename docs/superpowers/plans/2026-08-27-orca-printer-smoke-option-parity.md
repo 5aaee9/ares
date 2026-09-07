@@ -9830,3 +9830,18 @@ ate the end g-code's `M107 ; turn off fan` (80fb75 regression).
 Fixed: fan_layers_end captured after the layer loop; the mover
 processes [fan_layers_start..fan_layers_end] only, tail re-appended
 untouched. Fleet **764 → 766/987** (80fb75 restored + one more).
+
+## 2026-09-07 (cont 463): deposition-17 anchor = inward-move DUPLICATE (70x)
+
+Anchor 02815e7 (deposition 17 family, 20 cases): GT emits the wipe-
+on-loops inward move TWICE (140 `G1 X164.715 Y179.715` lines = 70
+identical pairs) where mine emits it once (70). Pattern per loop:
+wall-end → `M204 T1000` → travel F7200 → `G1 164.715 179.715` ×2 →
+`G1 X164.89 Y179.89`. Upstream extrude_loop's inward move is ONE
+extrude_to_xy (GCode.cpp:6033); the duplicate must come from a
+second emission site (wipe-path tail landing at the same point, or
+a travel re-statement). 70 occurrences = every outer-wall loop in
+the print. NEXT: instrument both micro-move emission sites (wipe
+tail in travel.rs + append_inward_move) for this fixture and locate
+which site GT's second identical line belongs to; then add the
+missing emission.
