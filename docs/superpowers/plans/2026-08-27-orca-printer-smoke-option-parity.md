@@ -9709,3 +9709,23 @@ NEXT: map my 62 ARES_DUMP_PRECOOLING layer dumps to the GT chunk
 lens (byte-diff each pair) to find exactly which pre/post lines
 shift the boundary, then re-wire the per-layer flush at the exact
 byte offsets.
+
+## 2026-09-07 (cont 456): chunk-unit mapping — prefix IS chunk 1; layer unit still mismatched
+
+Per-layer byte comparison (ARES_DUMP_PRECOOLING LAYER sections vs
+GT chunk lens, anchor 0e56eb):
+- GT chunk 1 = 1860 = EXACTLY the file prefix (header + start gcode,
+  lines 1..132, ending before the first ;LAYER_CHANGE at 133) — the
+  start gcode DOES pass through the mover as chunk 1 (the :3165
+  flush must be fed by the generator's first LayerResult or the
+  filter receives the prefix; the lazy construction note in cont 455
+  was wrong about it being a no-op).
+- Layer unit STILL mismatched: GT chunk 2 = 2730 vs my layer-1 slice
+  2072 (my slice starts at PART_FAN_MARKER); GT's ;LAYER_CHANGE→
+  next marker span = 1875. 2730 ≠ 1875 ⇒ the cooling-buffer output
+  unit ≠ marker span either (M73 insertions by the mover itself grow
+  chunks). Hypothesis: the mover chunk = layer content PLUS the next
+  layer's leading marker lines, with mover-inserted M73 counted.
+NEXT: dump the GT mover's per-chunk OUTPUT (patch after flush to
+write the processed chunk itself) and align against my slices
+directly — comparing consumed sizes alone cannot resolve the unit.
