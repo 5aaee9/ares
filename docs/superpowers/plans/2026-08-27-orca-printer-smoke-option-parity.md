@@ -9887,3 +9887,21 @@ NEXT: extend the GT site patch to also print paths.size() and each
 path's point count — the wall-less call will show size>0 but
 clipped-to-empty content; locate the caller emitting that second
 loop (likely the seam re-approach fake loop).
+
+## 2026-09-07 (cont 466): site counts split — 213 role=1 + 71 role=2 fires
+
+inwarddump2.patch (result-inwarddump2): the 5994 site fires 284 =
+213 inner-wall (role=1, gate-failing) + **71 external (role=2,
+gate-passing)**. GT has 140 inward lines ⇒ only ~half come from
+wipe_on_loops; the other ~69 are a SECOND emission of the same
+rounded point, sitting BETWEEN the travel arrival (F7200 at
+179.64) and the WIPE_START (+13 lines later) — i.e. before the
+retract, not after. The pair order: travel → 179.715 → 179.715 →
+164.89/179.89. My output has travel → 179.715 (one) → 164.89.
+Candidates for the second: the GCodeWriter's position re-statement
+at a region/entity boundary, or the loop collection emitting the
+inward move at loop END and a copy at the next loop's start
+approach. NEXT: extend the dump to print the computed pt coords at
+the 5994 site — if both 179.715 lines come from THIS site (71
+fires ≈ 70 loops but 140 lines?), then each pass emits two lines
+(writer-level duplicate inside extrude_to_xy with dE=0 + force).
