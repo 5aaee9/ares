@@ -3,6 +3,9 @@ use std::path::Path;
 use regex::Regex;
 use serde_json::Value;
 
+#[path = "widths.rs"]
+pub(super) mod widths;
+
 #[derive(Clone, Debug)]
 pub(super) struct OptionPlan {
     pub(super) key: String,
@@ -11,6 +14,7 @@ pub(super) struct OptionPlan {
     pub(super) source: String,
     pub(super) cases: Vec<OptionCase>,
     pub(super) omission: Option<&'static str>,
+    pub(super) width_domain: Option<widths::WidthDomain>,
 }
 
 #[derive(Clone, Debug)]
@@ -46,7 +50,13 @@ fn plan(entry: &Value, lines: &[&str], source_text: &str) -> Option<OptionPlan> 
     let line = definition.get("line")?.as_u64()? as usize;
     let source = format!("{}:{}", definition.get("path")?.as_str()?, line);
     let block = definition_block(lines, &key, line);
-    let (values, omission) = if matches!(option_type.as_str(), "coBool" | "coBools") {
+    let mut width_domain = None;
+    let (values, omission) = if matches!(key.as_str(), "line_width" | "bridge_line_width") {
+        let raw = raw_numeric_bounds(&block).expect("width schema must have explicit raw bounds");
+        let (domain, values) = widths::generate(&key, entry, raw, false, false);
+        width_domain = Some(domain);
+        (values, None)
+    } else if matches!(option_type.as_str(), "coBool" | "coBools") {
         (
             vec![case("false", "0", entry), case("true", "1", entry)],
             None,
@@ -85,6 +95,7 @@ fn plan(entry: &Value, lines: &[&str], source_text: &str) -> Option<OptionPlan> 
         source,
         cases: values,
         omission,
+        width_domain,
     })
 }
 
@@ -201,6 +212,17 @@ fn known_vector_enum(key: &str) -> &'static [&'static str] {
     }
 }
 
+fn raw_numeric_bounds(block: &str) -> Option<(f64, f64)> {
+    let bound = |name: &str| {
+        Regex::new(&format!(r"def->{name}\s*=\s*([-+]?\d+(?:\.\d+)?)"))
+            .unwrap()
+            .captures(block)
+            .and_then(|captures| captures[1].parse::<f64>().ok())
+    };
+    Some((bound("min")?, bound("max")?))
+}
+
+// Legacy domains outside the two-key vertical remain unverified.
 fn numeric_bounds(block: &str) -> Option<(f64, f64)> {
     let bound = |name: &str| {
         Regex::new(&format!(r"def->{name}\s*=\s*([-+]?\d+(?:\.\d+)?)"))

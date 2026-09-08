@@ -3,113 +3,28 @@
 #[path = "option_coverage/domains.rs"]
 mod domains;
 #[cfg(test)]
+#[path = "option_coverage/float_percent_tests.rs"]
+mod float_percent_tests;
+#[cfg(test)]
+#[path = "option_coverage/owner_pair_tests.rs"]
+mod owner_pair_tests;
+#[cfg(test)]
+#[path = "option_coverage/sweep.rs"]
+mod sweep;
+#[cfg(test)]
 #[path = "option_coverage/tests.rs"]
 mod tests;
-
-use std::path::PathBuf;
 
 use crate::{
     self as parity,
     presets::VendorProfiles,
-    runner::{self, CaseInputs, OrcaRunner},
+    runner::{self, OrcaRunner},
 };
 use serde_json::{Map, Value};
+use std::path::PathBuf;
 
 fn profiles_root() -> PathBuf {
     runner::repo_root().join("OrcaSlicer/resources/profiles")
-}
-
-#[test]
-fn orca_parity_option_coverage() {
-    if std::env::var("ARES_PARITY_OPTIONS").as_deref() != Ok("1") {
-        eprintln!("skipping: set ARES_PARITY_OPTIONS=1 to run option coverage");
-        return;
-    }
-    let Some(runner) = OrcaRunner::from_env() else {
-        eprintln!("skipping: no OrcaSlicer CLI available");
-        return;
-    };
-    let profiles = VendorProfiles::load(&profiles_root(), "Creality").unwrap();
-    let selection =
-        parity::select_printer(&profiles, "Creality", "Creality Ender-3 0.4 nozzle").unwrap();
-    let machine = profiles.machine(&selection.printer).unwrap();
-    let mut process = profiles.process(&selection.process).unwrap();
-    parity::normalize_process_defaults(&machine, &mut process);
-    let mut filaments = selection
-        .filaments
-        .iter()
-        .map(|name| profiles.filament(name).unwrap())
-        .collect::<Vec<_>>();
-    parity::normalize_filament_defaults(&mut filaments);
-    let plans = domains::load(&runner::repo_root());
-    let mut outcomes = Vec::new();
-    for plan in &plans {
-        if plan.cases.is_empty() {
-            outcomes.push(OptionOutcome::omitted(plan));
-            continue;
-        }
-        let mut first_failure = None;
-        let mut compared = 0;
-        let mut rejected = Vec::new();
-        for case in &plan.cases {
-            let mut case_machine = machine.clone();
-            let mut case_process = process.clone();
-            let mut case_filaments = filaments.clone();
-            inject_case(
-                plan,
-                case,
-                &mut case_machine,
-                &mut case_process,
-                &mut case_filaments,
-            );
-            let label = format!("option/{}/{}", plan.key, case.label);
-            // The case value must win over the baseline smoke overrides;
-            // drop the key from the override map so the injected preset
-            // value survives (`option-coverage` requirement 3).
-            let mut overrides = parity::smoke_overrides();
-            overrides.remove(&plan.key);
-            let built = runner.build_case(
-                &CaseInputs {
-                    label: &label,
-                    machine: &case_machine,
-                    process: &case_process,
-                    filaments: &case_filaments,
-                },
-                &overrides,
-                &runner::repo_root().join("tests/parity/cube10.stl"),
-            );
-            let outcome = match built {
-                Ok(case) => {
-                    compared += 1;
-                    parity::compare_case(&case)
-                }
-                Err(error) => {
-                    rejected.push(format!("{}: {error}", case.label));
-                    eprintln!("[option] UPSTREAM_REJECTED {label}");
-                    continue;
-                }
-            };
-            eprintln!("[option] {} {}", outcome.status, label);
-            if outcome.status != "PASS" && first_failure.is_none() {
-                first_failure = Some(format!("{}: {}", case.label, outcome.detail));
-            }
-        }
-        outcomes.push(OptionOutcome::executed(
-            plan,
-            compared,
-            rejected,
-            first_failure,
-        ));
-    }
-    write_summary(&outcomes);
-    let failures = outcomes
-        .iter()
-        .filter(|outcome| outcome.status == "FAIL" || outcome.status == "MISSING")
-        .count();
-    assert_eq!(
-        failures, 0,
-        "{failures} option domains fail; see tests/parity/option-coverage-summary.md"
-    );
 }
 
 fn inject_case(
@@ -156,6 +71,10 @@ fn residual_is_machine(key: &str) -> bool {
     )
 }
 
+fn strict_comparator_ran(status: &str) -> bool {
+    matches!(status, "PASS" | "DIVERGENT")
+}
+
 struct OptionOutcome {
     key: String,
     option_type: String,
@@ -176,10 +95,27 @@ impl OptionOutcome {
     ) -> Self {
         let (status, detail) = if let Some(detail) = failure {
             ("FAIL", detail)
-        } else if compared == 0 {
-            ("REJECTED", rejected.join("; "))
+        } else if compared == 0
+            || compared != plan.cases.len()
+            || !rejected.is_empty()
+            || plan.cases.iter().any(|case| case.value.is_none())
+        {
+            (
+                "INCOMPLETE",
+                format!(
+                    "required legal cases not all compared; {}",
+                    rejected.join("; ")
+                ),
+            )
+        } else if plan.width_domain.is_none() {
+            // Legacy generation has no effective-application proof and does not
+            // establish full legality for its numeric or unbounded domains.
+            (
+                "INCOMPLETE",
+                "legacy domain application/legality unverified".into(),
+            )
         } else {
-            ("PASS", rejected.join("; "))
+            ("PASS", String::new())
         };
         Self::new(
             plan,
@@ -222,25 +158,17 @@ fn write_summary(outcomes: &[OptionOutcome]) {
         .iter()
         .filter(|outcome| outcome.status == "PASS")
         .count();
-    let generated_cases = outcomes.iter().map(|outcome| outcome.cases).sum::<usize>();
-    let compared_cases = outcomes
+    let generated = outcomes.iter().map(|outcome| outcome.cases).sum::<usize>();
+    let compared = outcomes
         .iter()
         .map(|outcome| outcome.compared)
         .sum::<usize>();
-    let rejected_cases = outcomes
+    let rejected = outcomes
         .iter()
         .map(|outcome| outcome.rejected)
         .sum::<usize>();
-    let compared_domains = outcomes
-        .iter()
-        .filter(|outcome| matches!(outcome.status, "PASS" | "FAIL"))
-        .count();
-    let rejected_domains = outcomes
-        .iter()
-        .filter(|outcome| outcome.status == "REJECTED")
-        .count();
     let mut output = format!(
-        "# OrcaSlicer option coverage summary\n\n{pass} of {compared_domains} compared option domains pass ({} source-cited domains; {generated_cases} generated cases: {compared_cases} compared, {rejected_cases} rejected upstream; {rejected_domains} domains fully rejected upstream).\n\n| status | option | type | cases | compared | rejected | upstream | first result |\n|---|---|---|---:|---:|---:|---|---|\n",
+        "# OrcaSlicer option coverage summary\n\n{pass}/{} bounded domains complete; {generated} generated, {compared} strictly compared, {rejected} rejected. Not all-printer/default coverage.\n\n| status | option | type | cases | compared | rejected | upstream | first result |\n|---|---|---|---:|---:|---:|---|---|\n",
         outcomes.len()
     );
     for outcome in outcomes {
@@ -253,15 +181,18 @@ fn write_summary(outcomes: &[OptionOutcome]) {
             outcome.compared,
             outcome.rejected,
             outcome.source,
-            outcome.detail.replace(['\n', '|'], " "),
+            outcome.detail.replace(['\n', '|'], " ")
         ));
     }
-    std::fs::write(
-        runner::repo_root().join("tests/parity/option-coverage-summary.md"),
-        output,
+    let root = parity::artifacts::root_from_env().unwrap();
+    parity::artifacts::write(&root.join("option-coverage-summary.md"), output.as_bytes()).unwrap();
+    let plans = domains::load(&runner::repo_root());
+    let widths = plans.iter().filter_map(|plan| plan.width_domain.as_ref().map(|domain| {
+        serde_json::json!({"key": plan.key, "domain": domain.metadata, "nonexecuted_probes": domain.probes})
+    })).collect::<Vec<_>>();
+    parity::artifacts::write(
+        &root.join("width-domains.json"),
+        &serde_json::to_vec_pretty(&widths).unwrap(),
     )
     .unwrap();
 }
-
-#[allow(dead_code)]
-fn _type_assertion(_: &Map<String, Value>) {}

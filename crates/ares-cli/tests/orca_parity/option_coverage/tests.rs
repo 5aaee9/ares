@@ -142,7 +142,7 @@ fn upstream_rejection_does_not_mask_compared_case_parity() {
         Some("max: divergent".to_owned()),
     );
 
-    assert_eq!(passing.status, "PASS");
+    assert_eq!(passing.status, "INCOMPLETE");
     assert_eq!((passing.compared, passing.rejected), (2, 1));
     assert_eq!(failing.status, "FAIL");
 }

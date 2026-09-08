@@ -3,14 +3,31 @@
 //! G-code, and caches reference output keyed by the input digest.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::time::Duration;
 
 use serde_json::{Map, Value};
 
+#[path = "runner/application.rs"]
+pub(crate) mod application;
+#[cfg(test)]
+#[path = "runner/application_tests.rs"]
+mod application_tests;
+#[cfg(test)]
+#[path = "runner/stage_tests.rs"]
+mod stage_tests;
+#[path = "runner/stages.rs"]
+pub(crate) mod stages;
 #[cfg(test)]
 #[path = "runner/tests.rs"]
 mod tests;
+
+use stages::{FailureKind, Stage, StageError};
+
+pub(super) struct ExportedCase {
+    pub(super) label: String,
+    pub(super) project: Vec<u8>,
+    project_path: PathBuf,
+    output_dir: PathBuf,
+}
 
 pub(super) struct OrcaRunner {
     bin: PathBuf,
@@ -46,8 +63,12 @@ impl OrcaRunner {
             eprintln!("ares-parity: ARES_ORCA_BIN {:?} not found; skipping", bin);
             return None;
         }
-        let work = std::env::temp_dir().join(format!("ares-parity-{}", std::process::id()));
-        std::fs::create_dir_all(&work).ok()?;
+        let root = crate::artifacts::root_from_env().ok()?;
+        let work = tempfile::Builder::new()
+            .prefix("orca-runner-")
+            .tempdir_in(root)
+            .ok()?
+            .keep();
         Some(Self { bin, work })
     }
 
@@ -59,6 +80,26 @@ impl OrcaRunner {
         overrides: &Map<String, Value>,
         model: &Path,
     ) -> Result<ParityCase, String> {
+        self.build_case_checked(inputs, overrides, model)
+            .map_err(|error| error.to_string())
+    }
+
+    pub(super) fn build_case_checked(
+        &self,
+        inputs: &CaseInputs<'_>,
+        overrides: &Map<String, Value>,
+        model: &Path,
+    ) -> Result<ParityCase, StageError> {
+        let exported = self.export_case(inputs, overrides, model)?;
+        self.slice_case(exported)
+    }
+
+    pub(super) fn export_case(
+        &self,
+        inputs: &CaseInputs<'_>,
+        overrides: &Map<String, Value>,
+        model: &Path,
+    ) -> Result<ExportedCase, StageError> {
         let label = inputs.label;
         let machine = apply_override(inputs.machine, overrides, PresetKind::Machine);
         let mut process = apply_override(inputs.process, overrides, PresetKind::Process);
@@ -89,8 +130,11 @@ impl OrcaRunner {
         let slug = digest_slug(label, &machine, &process, &filaments, model);
         let project_path = self.work.join(format!("{slug}.3mf"));
         let output_dir = self.work.join(&slug);
-        let reference_path = output_dir.join("plate_1.gcode");
-
+        std::fs::create_dir_all(&output_dir)
+            .map_err(|error| StageError::new(Stage::Export, FailureKind::Io, error))?;
+        let model_bytes = stages::read(model, Stage::Export)?;
+        std::fs::write(output_dir.join("input.stl"), model_bytes)
+            .map_err(|error| StageError::new(Stage::Export, FailureKind::Io, error))?;
         if !project_path.exists() {
             let machine_file = self.work.join(format!("{slug}-machine.json"));
             let process_file = self.work.join(format!("{slug}-process.json"));
@@ -103,7 +147,7 @@ impl OrcaRunner {
                 filament_files.push(file);
             }
 
-            run_orca(
+            stages::run(
                 &self.bin,
                 [
                     "--load-settings",
@@ -117,12 +161,29 @@ impl OrcaRunner {
                 .into_iter()
                 .chain([project_path.to_str().unwrap(), model.to_str().unwrap()])
                 .map(std::borrow::ToOwned::to_owned),
+                Stage::Export,
+                &self.work,
             )?;
         }
+        let project = stages::read(&project_path, Stage::Export)?;
+        Ok(ExportedCase {
+            label: label.to_owned(),
+            project,
+            project_path,
+            output_dir,
+        })
+    }
 
+    pub(super) fn slice_case(&self, exported: ExportedCase) -> Result<ParityCase, StageError> {
+        let ExportedCase {
+            label,
+            project,
+            project_path,
+            output_dir,
+        } = exported;
+        let reference_path = output_dir.join("plate_1.gcode");
         if !reference_path.exists() {
-            std::fs::create_dir_all(&output_dir).map_err(|e| e.to_string())?;
-            run_orca(
+            stages::run(
                 &self.bin,
                 [
                     "--slice",
@@ -133,12 +194,12 @@ impl OrcaRunner {
                 ]
                 .into_iter()
                 .map(std::borrow::ToOwned::to_owned),
+                Stage::Slice,
+                &self.work,
             )?;
         }
 
-        let project = std::fs::read(&project_path).map_err(|e| format!("{project_path:?}: {e}"))?;
-        let reference =
-            std::fs::read(&reference_path).map_err(|e| format!("{reference_path:?}: {e}"))?;
+        let reference = stages::read(&reference_path, Stage::Slice)?;
         Ok(ParityCase {
             label: label.to_owned(),
             project,
@@ -184,15 +245,16 @@ fn smoke_owner(key: &str) -> Option<PresetKind> {
     }
 }
 
-fn write_preset(path: &Path, kind: &str, fields: &Map<String, Value>) -> Result<(), String> {
+fn write_preset(path: &Path, kind: &str, fields: &Map<String, Value>) -> Result<(), StageError> {
     // Keep the preset's own name: the CLI matches it against
     // compatible_printers when both machine and process are loaded.
     let mut preset = fields.clone();
     preset.insert("type".into(), Value::String(kind.to_owned()));
     preset.insert("from".into(), Value::String("system".to_owned()));
     preset.insert("instantiation".into(), Value::String("true".to_owned()));
-    let text = serde_json::to_string(&preset).map_err(|e| e.to_string())?;
-    std::fs::write(path, text).map_err(|e| format!("{path:?}: {e}"))
+    let text = serde_json::to_string(&preset).unwrap();
+    std::fs::write(path, text)
+        .map_err(|e| StageError::new(Stage::Preset, FailureKind::Io, format!("{path:?}: {e}")))
 }
 
 fn join_paths<'a>(paths: impl Iterator<Item = &'a PathBuf>) -> String {
@@ -205,49 +267,6 @@ fn join_paths<'a>(paths: impl Iterator<Item = &'a PathBuf>) -> String {
     }
     joined
 }
-
-fn run_orca(bin: &Path, args: impl IntoIterator<Item = String>) -> Result<(), String> {
-    let args: Vec<String> = args.into_iter().collect();
-    use std::io::Read;
-    let mut child = Command::new(bin)
-        .args(&args)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("spawn {:?}: {error}", bin))?;
-    let deadline = std::time::Instant::now() + ORCA_TIMEOUT;
-    loop {
-        match child.try_wait().map_err(|e| e.to_string())? {
-            Some(status) if status.success() => return Ok(()),
-            Some(status) => {
-                let mut stdout = String::new();
-                let mut stderr = String::new();
-                if let Some(mut pipe) = child.stdout.take() {
-                    pipe.read_to_string(&mut stdout).ok();
-                }
-                if let Some(mut pipe) = child.stderr.take() {
-                    pipe.read_to_string(&mut stderr).ok();
-                }
-                return Err(format!(
-                    "orca-slicer failed ({status}): {}",
-                    stdout
-                        .lines()
-                        .chain(stderr.lines())
-                        .last()
-                        .unwrap_or("no output")
-                ));
-            }
-            None if std::time::Instant::now() > deadline => {
-                let _ = child.kill();
-                return Err("orca-slicer timed out".to_owned());
-            }
-            None => std::thread::sleep(Duration::from_millis(100)),
-        }
-    }
-}
-
-const ORCA_TIMEOUT: Duration = Duration::from_secs(300);
 
 fn digest_slug(
     label: &str,

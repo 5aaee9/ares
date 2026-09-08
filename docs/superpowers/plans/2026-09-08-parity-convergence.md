@@ -4,6 +4,10 @@ Historical wave record: the [strict oracle follow-up](2026-09-08-strict-output-o
 replaces the partial acceptance gate below with generator-only ordered bytes.
 Classic's historical partial PASS is now a strict rejection, not a repaired
 slicing case; missing inventory/effective-config/plate/provenance coverage remains.
+The [bounded width-domain follow-up](2026-09-08-float-percent-domain-parity.md)
+separates units/schema/context and stage failures for two keys, with two real
+process-owner export proofs. Both fresh producer attempts remain ARES_ERROR;
+no width domain, actual-default matrix or Tier1 parity completion is claimed.
 
 ## Approved seam and source boundary
 
