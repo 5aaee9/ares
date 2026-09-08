@@ -6,8 +6,8 @@ mod tests;
 mod types;
 
 pub(in crate::project_slice) use types::{
-    PreparedLayerRegionPerimeterObject, PreparedLayerRegionPerimeterRecord,
-    PreparedPostLayerRegionPerimeters,
+    PostPerimeterPredecessor, PreparedLayerRegionPerimeterObject,
+    PreparedLayerRegionPerimeterRecord, PreparedPostLayerRegionPerimeters,
 };
 
 use super::classic::{
@@ -36,7 +36,7 @@ pub(in crate::project_slice) fn finish(
     } = prepared;
     let objects = objects.into_iter().map(materialize_object).collect();
     PreparedPostLayerRegionPerimeters {
-        predecessor,
+        predecessor: PostPerimeterPredecessor::Classic(predecessor),
         objects,
     }
 }

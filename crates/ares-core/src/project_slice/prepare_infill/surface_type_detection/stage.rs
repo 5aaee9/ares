@@ -40,11 +40,12 @@ struct StageRecordContext {
 pub(super) fn project(
     prepared: &PreparedPostLayerRegionPerimeters,
 ) -> Result<Vec<StagedObject>, SliceError> {
-    assert_eq!(prepared.objects.len(), prepared.predecessor.objects.len());
+    let classic = prepared.predecessor.as_classic();
+    assert_eq!(prepared.objects.len(), classic.objects.len());
     prepared
         .objects
         .iter()
-        .zip(&prepared.predecessor.objects)
+        .zip(&classic.objects)
         .map(|(object, traversal)| stage_object(prepared, object, traversal))
         .collect()
 }
@@ -61,6 +62,7 @@ fn stage_object(
     let source_index = input_object.identity().0;
     let options = &prepared
         .predecessor
+        .as_classic()
         .resolved
         .objects
         .iter()
@@ -70,6 +72,7 @@ fn stage_object(
     let bottom_kind = preflight::bottom_kind(options);
     let spiral_mode = prepared
         .predecessor
+        .as_classic()
         .resolved
         .views
         .full
@@ -119,7 +122,7 @@ fn stage_object(
         &input_object.records,
         input_object,
         options.enable_extra_bridge_layer,
-        prepared.predecessor.scale,
+        prepared.predecessor.as_classic().scale,
     )?;
     for (staged, output) in records.iter_mut().zip(&object.records) {
         match (staged, output) {

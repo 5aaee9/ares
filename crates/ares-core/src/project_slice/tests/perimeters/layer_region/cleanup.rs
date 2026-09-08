@@ -21,7 +21,7 @@ fn task22o16_success_cleanup_with_both_deep_predecessors_fits_constrained_stack(
         for object in output.objects {
             incomplete_sink::consume_layer_region_perimeter_object(object);
         }
-        incomplete_sink::consume_boxed_post_classic_traversal(output.predecessor);
+        incomplete_sink::consume_boxed_post_classic_traversal(output.predecessor.into_classic());
     });
 }
 

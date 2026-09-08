@@ -16,7 +16,7 @@ use super::super::super::support::KsrArchive;
 fn task22o17_geometry_failure_consumes_the_unmoved_predecessor_transactionally() {
     let prepared =
         perimeters::prepare_post_layer_region_perimeters(&KsrArchive::new().bytes()).unwrap();
-    let (weak, dropped) = prepared.predecessor.drop_probe_observer();
+    let (weak, dropped) = prepared.predecessor.as_classic().drop_probe_observer();
     reset_geometry_hooks();
     fail_geometry_at(GeometryStep::TopSafetyDifference);
     let error = match surface_type_detection::prepare(prepared) {

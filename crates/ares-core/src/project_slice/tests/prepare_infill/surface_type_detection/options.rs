@@ -88,7 +88,7 @@ fn geometry_metadata_checksum(prepared: &PreparedPostSurfaceTypeDetection) -> i1
 
 fn prepare_option_case(archive: KsrArchive) -> (PreparedPostSurfaceTypeDetection, i128) {
     let source = prepare_post_layer_region_perimeters(&archive.bytes()).unwrap();
-    let predecessor = std::ptr::from_ref(source.predecessor.as_ref());
+    let predecessor = std::ptr::from_ref(source.predecessor.as_classic());
     let checksum = o16::checksum(&source);
     let output = surface_type_detection::prepare(source).unwrap();
     assert_eq!(std::ptr::from_ref(output.predecessor.as_ref()), predecessor);

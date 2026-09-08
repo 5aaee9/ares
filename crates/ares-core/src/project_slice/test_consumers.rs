@@ -94,7 +94,7 @@ pub(super) fn consume_post_layer_region_perimeters(
     for object in layer_region_objects {
         incomplete_sink::consume_layer_region_perimeter_object(object);
     }
-    consume_post_classic_traversal_context(predecessor, metadata)
+    consume_post_classic_traversal_context(predecessor.into_classic(), metadata)
 }
 
 #[inline(never)]

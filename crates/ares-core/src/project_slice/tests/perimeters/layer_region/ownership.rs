@@ -46,7 +46,10 @@ fn task22o16_moves_only_source_layer_region_allocations_and_keeps_boxed_context(
 
     let output = layer_region::finish(source);
 
-    assert_eq!(std::ptr::from_ref(output.predecessor.as_ref()), predecessor);
+    assert_eq!(
+        std::ptr::from_ref(output.predecessor.as_classic()),
+        predecessor
+    );
     assert_eq!(output_perimeter_allocations(&output.objects), perimeters);
     assert_eq!(output_gap_allocations(&output.objects), gaps);
     assert_eq!(

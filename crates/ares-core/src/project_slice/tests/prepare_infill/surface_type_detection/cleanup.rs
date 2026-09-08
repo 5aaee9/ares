@@ -47,7 +47,7 @@ const ERROR: &str = "surface-type detection geometry is outside the supported Cl
 fn task22o17_success_cleanup_with_both_deep_predecessors_fits_constrained_stack() {
     let mut source =
         perimeters::prepare_post_layer_region_perimeters(&KsrArchive::new().bytes()).unwrap();
-    deepen_both_tree_families(&mut source.predecessor);
+    deepen_both_tree_families(source.predecessor.as_classic_mut());
     run_on_constrained_stack(move || {
         let output = surface_type_detection::prepare(source).unwrap();
         for object in output.objects {
@@ -61,7 +61,7 @@ fn task22o17_success_cleanup_with_both_deep_predecessors_fits_constrained_stack(
 fn task22o17_every_project_staging_failure_with_deep_predecessors_fits_constrained_stack() {
     let mut source =
         perimeters::prepare_post_layer_region_perimeters(&KsrArchive::new().bytes()).unwrap();
-    deepen_both_tree_families(&mut source.predecessor);
+    deepen_both_tree_families(source.predecessor.as_classic_mut());
     run_on_constrained_stack(move || {
         reset_geometry_hooks();
         stage_for_test(&source).unwrap();
@@ -69,9 +69,9 @@ fn task22o17_every_project_staging_failure_with_deep_predecessors_fits_constrain
         for step in STEPS {
             assert!(reached.contains(&step), "KSR must reach {step:?}");
         }
-        let predecessor = std::ptr::from_ref(source.predecessor.as_ref());
+        let predecessor = std::ptr::from_ref(source.predecessor.as_classic());
         let allocations = first_record_allocations(&source);
-        let (drop_probe, dropped) = source.predecessor.drop_probe_observer();
+        let (drop_probe, dropped) = source.predecessor.as_classic().drop_probe_observer();
         for step in STEPS {
             reset_geometry_hooks();
             fail_geometry_at(step);
@@ -81,7 +81,10 @@ fn task22o17_every_project_staging_failure_with_deep_predecessors_fits_constrain
                 "project staging must fail at {step:?}"
             );
             assert!(geometry_events().contains(&step));
-            assert_eq!(std::ptr::from_ref(source.predecessor.as_ref()), predecessor);
+            assert_eq!(
+                std::ptr::from_ref(source.predecessor.as_classic()),
+                predecessor
+            );
             assert_eq!(first_record_allocations(&source), allocations);
         }
         reset_geometry_hooks();
@@ -101,16 +104,17 @@ fn task22o17_every_project_staging_failure_with_deep_predecessors_fits_constrain
 fn task22o17_preflight_failure_with_deep_predecessors_fits_constrained_stack() {
     let mut source =
         perimeters::prepare_post_layer_region_perimeters(&KsrArchive::new().bytes()).unwrap();
-    deepen_both_tree_families(&mut source.predecessor);
-    source.predecessor.resolved.objects[0]
+    deepen_both_tree_families(source.predecessor.as_classic_mut());
+    source.predecessor.as_classic_mut().resolved.objects[0]
         .object
         .interface_shells = crate::OrcaBool(true);
-    let second_part =
-        source.predecessor.resolved.objects[0].layer_candidates[0].model_parts[0].clone();
-    source.predecessor.resolved.objects[0].layer_candidates[0]
+    let second_part = source.predecessor.as_classic().resolved.objects[0].layer_candidates[0]
+        .model_parts[0]
+        .clone();
+    source.predecessor.as_classic_mut().resolved.objects[0].layer_candidates[0]
         .model_parts
         .push(second_part);
-    let (drop_probe, dropped) = source.predecessor.drop_probe_observer();
+    let (drop_probe, dropped) = source.predecessor.as_classic().drop_probe_observer();
     run_on_constrained_stack(move || {
         let error = match surface_type_detection::prepare(source) {
             Err(error) => error,
@@ -129,8 +133,8 @@ fn task22o17_preflight_failure_with_deep_predecessors_fits_constrained_stack() {
 fn task22o17_public_incomplete_cleanup_with_deep_predecessors_fits_constrained_stack() {
     let mut source =
         perimeters::prepare_post_layer_region_perimeters(&KsrArchive::new().bytes()).unwrap();
-    deepen_both_tree_families(&mut source.predecessor);
-    let (drop_probe, dropped) = source.predecessor.drop_probe_observer();
+    deepen_both_tree_families(source.predecessor.as_classic_mut());
+    let (drop_probe, dropped) = source.predecessor.as_classic().drop_probe_observer();
     run_on_constrained_stack(move || {
         let output = fill_surfaces::prepare(surface_type_detection::prepare(source).unwrap());
         let output = vertical_shells::prepare(output).unwrap();

@@ -46,7 +46,8 @@ pub(in crate::project_slice::tests) fn checksum(
 ) -> i128 {
     let mut checksum = 0_i128;
     mix(&mut checksum, prepared.objects.len() as i128);
-    for (object, traversal) in prepared.objects.iter().zip(&prepared.predecessor.objects) {
+    let classic = prepared.predecessor.as_classic();
+    for (object, traversal) in prepared.objects.iter().zip(&classic.objects) {
         mix(&mut checksum, OBJECT_BEGIN);
         let input_object = &traversal
             .predecessor

@@ -29,7 +29,7 @@ pub(in crate::project_slice) fn prepare(
     #[cfg(test)]
     INVOCATIONS.with(|count| count.set(count.get() + 1));
 
-    if let Err(error) = preflight::validate(&prepared.predecessor.resolved.objects) {
+    if let Err(error) = preflight::validate(&prepared.predecessor.as_classic().resolved.objects) {
         dispose_predecessor(prepared);
         return Err(error);
     }
@@ -64,7 +64,7 @@ pub(in crate::project_slice) fn prepare(
         })
         .collect();
     Ok(PreparedPostSurfaceTypeDetection {
-        predecessor,
+        predecessor: predecessor.into_classic(),
         objects,
     })
 }
@@ -77,7 +77,7 @@ fn dispose_predecessor(prepared: PreparedPostLayerRegionPerimeters) {
     for object in objects {
         incomplete_sink::consume_layer_region_perimeter_object(object);
     }
-    incomplete_sink::consume_boxed_post_classic_traversal(predecessor);
+    incomplete_sink::consume_boxed_post_classic_traversal(predecessor.into_classic());
 }
 
 #[cfg(test)]
