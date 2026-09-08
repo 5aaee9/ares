@@ -1,5 +1,6 @@
 mod arc_accounting;
 mod delays;
+mod envelope;
 mod estimate;
 mod motion;
 mod motion_util;
@@ -11,7 +12,7 @@ use estimate::Estimate;
 pub(super) use stats::{PRINT_TIME_SEC_PLACEHOLDER, USED_FILAMENT_LENGTH_PLACEHOLDER};
 use time::{duration, minutes};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct ProcessorLimits {
     pub(super) print_acceleration: f64,
     pub(super) retract_acceleration: f64,
@@ -19,6 +20,26 @@ pub(super) struct ProcessorLimits {
     pub(super) gcode_flavor: GCodeFlavor,
     pub(super) bbl_printer: bool,
     pub(super) junction_deviation: f64,
+    pub(super) max_feedrate: [f64; 4],
+    pub(super) max_acceleration: [f64; 4],
+    pub(super) jerk: [f64; 4],
+}
+
+#[cfg(test)]
+impl Default for ProcessorLimits {
+    fn default() -> Self {
+        Self {
+            print_acceleration: 0.0,
+            retract_acceleration: 0.0,
+            travel_acceleration: 0.0,
+            gcode_flavor: GCodeFlavor::default(),
+            bbl_printer: false,
+            junction_deviation: 0.0,
+            max_feedrate: [0.0; 4],
+            max_acceleration: [0.0; 4],
+            jerk: [9.0, 9.0, 3.0, 2.5],
+        }
+    }
 }
 
 pub(super) fn process(
@@ -115,6 +136,8 @@ fn is_progress_motion(line: &str) -> bool {
     )
 }
 
+#[cfg(test)]
+mod envelope_replay_tests;
 #[cfg(test)]
 mod seam_tests;
 #[cfg(test)]

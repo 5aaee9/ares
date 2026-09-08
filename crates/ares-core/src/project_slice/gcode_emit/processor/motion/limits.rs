@@ -3,6 +3,28 @@
 use super::{GCodeFlavor, MotionState, word};
 
 impl MotionState {
+    pub(in crate::project_slice::gcode_emit::processor) fn with_limits(
+        limits: crate::project_slice::gcode_emit::processor::ProcessorLimits,
+    ) -> Self {
+        let travel = if limits.gcode_flavor.supports_separate_travel_acceleration() {
+            limits.travel_acceleration
+        } else {
+            0.0
+        };
+        Self {
+            gcode_flavor: limits.gcode_flavor,
+            junction_deviation: limits.junction_deviation,
+            max_feedrate: limits.max_feedrate,
+            max_acceleration: limits.max_acceleration,
+            jerk: limits.jerk,
+            ..Self::with_acceleration_limits(
+                limits.print_acceleration,
+                limits.retract_acceleration,
+                travel,
+            )
+        }
+    }
+
     /// `GCodeProcessor.cpp:5766-5791`: for Marlin firmware with a positive
     /// `machine_max_junction_deviation`, the per-axis jerk limit derives
     /// from the junction deviation and the current print acceleration

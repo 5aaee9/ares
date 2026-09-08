@@ -31,6 +31,7 @@ fn replay(name: &str, reference: &str) {
         gcode_flavor: GCodeFlavor::MarlinFirmware,
         bbl_printer: false,
         junction_deviation: 0.01,
+        ..ProcessorLimits::default()
     };
     let actual = process(input.as_bytes().to_vec(), true, 0.0, 0.0, limits);
     let expected = reference.as_bytes();
@@ -53,55 +54,37 @@ fn replay(name: &str, reference: &str) {
 
 #[test]
 fn closed_external_wipe_off_matches_actual_orca_output() {
-    replay(
-        "wipe-off",
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../tests/processor_seam_cache/wipe-off.orca.gcode"
-        )),
-    );
+    replay("wipe-off", &fixture("wipe-off.orca.gcode"));
 }
 
 #[test]
 fn closed_external_inward_before_m204_matches_actual_orca_output() {
     replay(
         "solid-rectilinear",
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../tests/processor_seam_cache/solid-rectilinear.orca.gcode"
-        )),
+        &fixture("solid-rectilinear.orca.gcode"),
     );
 }
 
 #[test]
 fn anchor_matches_actual_orca_output() {
-    replay(
-        "anchor",
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../tests/processor_seam_cache/anchor.orca.gcode"
-        )),
-    );
+    replay("anchor", &fixture("anchor.orca.gcode"));
 }
 
 #[test]
 fn two_walls_matches_actual_orca_output() {
-    replay(
-        "two-walls",
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../tests/processor_seam_cache/two-walls.orca.gcode"
-        )),
-    );
+    replay("two-walls", &fixture("two-walls.orca.gcode"));
 }
 
 #[test]
 fn open_closed_roles_and_first_moving_commands_match_actual_orca_output() {
-    replay(
-        "classification",
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../tests/processor_seam_cache/classification.orca.gcode"
-        )),
-    );
+    replay("classification", &fixture("classification.orca.gcode"));
+}
+
+fn fixture(name: &str) -> String {
+    std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/processor_seam_cache")
+            .join(name),
+    )
+    .unwrap()
 }

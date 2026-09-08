@@ -22,19 +22,8 @@ impl Estimate {
         limits: ProcessorLimits,
     ) -> Self {
         let mut blocks = Vec::new();
-        let travel_limit = if limits.gcode_flavor.supports_separate_travel_acceleration() {
-            limits.travel_acceleration
-        } else {
-            0.0
-        };
-        let mut state = MotionState::with_acceleration_limits(
-            limits.print_acceleration,
-            limits.retract_acceleration,
-            travel_limit,
-        );
+        let mut state = MotionState::with_limits(limits);
         let mut prepare_stages = Vec::new();
-        state.gcode_flavor = limits.gcode_flavor;
-        state.junction_deviation = limits.junction_deviation;
         let mut events = Vec::new();
         let mut prepare_stage = false;
         let mut saw_motion_command = false;
