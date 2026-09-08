@@ -9,7 +9,7 @@ use std::{
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
-pub(super) const EVIDENCE: &str = "partial_semantic_only";
+pub(super) const EVIDENCE: &str = "ordered_bytes_generator_only";
 
 pub(super) fn root_from_env() -> Result<PathBuf, String> {
     let root = std::env::var_os("ARES_PARITY_ARTIFACT_ROOT")
@@ -107,12 +107,14 @@ pub(super) fn compare(
                 ares_core::GenerationMetadata::deterministic(2026, 8, 27, 0, 0, 0),
             )) {
                 Ok(actual) => {
-                    // Persist BOTH full streams before the deliberately partial comparator.
+                    // Persist BOTH full supplied streams before the strict byte comparator.
                     save(&directory, &mut files, "ares.gcode", &actual)?;
                     if actual.is_empty() {
                         crate::ares_error(label, "Ares produced empty output".into())
                     } else {
-                        match crate::semantic::compare_ignoring_time(reference, &actual) {
+                        match crate::golden::compare_ordered_bytes_generator_only(
+                            reference, &actual,
+                        ) {
                             Ok(()) => crate::pass(label),
                             Err(difference) => crate::divergence(label, difference),
                         }
@@ -143,8 +145,9 @@ pub(super) fn compare(
         "schema": 1,
         "label": label,
         "evidence": EVIDENCE,
-        "comparator": "semantic::compare_ignoring_time",
-        "not_checked": ["full XY travel", "timing", "M73", "config", "all statistics", "full command order"],
+        "comparator": "golden::compare_ordered_bytes_generator_only",
+        "not_checked": ["all-printer/default/domain inventory", "requested-versus-effective config coverage",
+            "all plates and artifact inventory", "reference producer identity"],
         "status": outcome.status,
         "detail": outcome.detail,
         "source": source,

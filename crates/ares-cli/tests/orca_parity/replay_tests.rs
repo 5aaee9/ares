@@ -101,22 +101,19 @@ fn explicit_divergent_orca_output_fails() {
 }
 
 #[test]
-fn successful_partial_check_saves_complete_paired_bytes_and_hashes() {
+fn unchanged_classic_is_strictly_rejected_with_complete_paired_bytes_and_hashes() {
     let temp = tempfile::tempdir().unwrap();
     let input = temp.path().join("input");
     fixture(&input, true);
     let artifacts = temp.path().join("artifacts");
     let output = replay(&input, &artifacts, temp.path());
-    assert!(
-        output.status.success(),
-        "{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
+    assert_failed(output);
     let summary: Value =
         serde_json::from_slice(&fs::read(artifacts.join("replay-summary.json")).unwrap()).unwrap();
-    assert_eq!(summary["evidence"], "partial_semantic_only");
+    assert_eq!(summary["evidence"], "ordered_bytes_generator_only");
     assert_eq!(summary["compared"], 1);
+    assert_eq!(summary["passed"], 0);
+    assert_eq!(summary["failed"], 1);
     let case = Path::new(summary["cases"][0]["artifacts"].as_str().unwrap());
     let manifest: Value =
         serde_json::from_slice(&fs::read(case.join("manifest.json")).unwrap()).unwrap();
@@ -152,7 +149,32 @@ fn successful_partial_check_saves_complete_paired_bytes_and_hashes() {
         .unwrap();
     assert_eq!(fs::read(case.join("ares.gcode")).unwrap(), actual);
     assert_eq!(manifest["reference_provenance"]["status"], "unknown");
-    assert_eq!(manifest["evidence"], "partial_semantic_only");
+    assert_eq!(manifest["evidence"], "ordered_bytes_generator_only");
+    assert_eq!(
+        manifest["comparator"],
+        "golden::compare_ordered_bytes_generator_only"
+    );
+    assert_eq!(manifest["status"], "DIVERGENT");
+    let error = fs::read_to_string(case.join("error.txt")).unwrap();
+    assert!(error.contains("first difference at byte"));
+    assert_eq!(manifest["detail"], error);
+    assert_eq!(manifest["files"]["error.txt"]["bytes"], error.len());
+    assert_eq!(
+        manifest["files"]["error.txt"]["sha256"],
+        Sha256::digest(error.as_bytes())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    );
+    assert_eq!(
+        manifest["not_checked"],
+        serde_json::json!([
+            "all-printer/default/domain inventory",
+            "requested-versus-effective config coverage",
+            "all plates and artifact inventory",
+            "reference producer identity"
+        ])
+    );
     assert!(
         manifest["ares_build"]["executable_sha256"]
             .as_str()

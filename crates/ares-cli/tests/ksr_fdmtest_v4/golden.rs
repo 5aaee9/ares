@@ -1,4 +1,10 @@
+//! Strict external stream oracle for GCode::do_export / GCodeWriter /
+//! GCodeProcessor::run_post_process (Orca 8500fcd), per ARD-0023.
 use std::fmt;
+
+#[cfg(test)]
+#[path = "ordered_bytes_tests.rs"]
+mod ordered_bytes_tests;
 
 const MAX_CONTEXT_LINE_BYTES: usize = 160;
 
@@ -33,19 +39,16 @@ pub(crate) fn normalize_one_generator_line(
     Ok(text.into_bytes())
 }
 
-pub(crate) fn normalize_uninitialized_object_ids(
-    bytes: &[u8],
-    object_id: u32,
-) -> Result<Vec<u8>, String> {
-    let pattern =
-        regex::Regex::new(r"(?m)^(; (?:stop )?printing object .+ id:)\d+( copy \d+)$").unwrap();
-    let text = std::str::from_utf8(bytes).map_err(|error| error.to_string())?;
-    Ok(pattern
-        .replace_all(text, |captures: &regex::Captures<'_>| {
-            format!("{}{object_id}{}", &captures[1], &captures[2])
-        })
-        .into_owned()
-        .into_bytes())
+pub(crate) fn compare_ordered_bytes_generator_only(
+    expected: &[u8],
+    actual: &[u8],
+) -> Result<(), String> {
+    let expected = normalize_one_generator_line(expected, GeneratorKind::Orca)?;
+    let actual = normalize_one_generator_line(actual, GeneratorKind::Ares)?;
+    match first_difference(&expected, &actual) {
+        Some(difference) => Err(difference.to_string()),
+        None => Ok(()),
+    }
 }
 
 pub(crate) struct Difference {

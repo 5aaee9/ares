@@ -1,5 +1,10 @@
 # Plan: parity convergence — fail-closed replay wave
 
+Historical wave record: the [strict oracle follow-up](2026-09-08-strict-output-oracle.md)
+replaces the partial acceptance gate below with generator-only ordered bytes.
+Classic's historical partial PASS is now a strict rejection, not a repaired
+slicing case; missing inventory/effective-config/plate/provenance coverage remains.
+
 ## Approved seam and source boundary
 
 Test project bytes through `ares_core::slice_project` against independently

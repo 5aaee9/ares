@@ -1,5 +1,16 @@
 # Spec: full-output Orca parity convergence
 
+## Strict oracle follow-up
+
+The [strict-output oracle slice](../plans/2026-09-08-strict-output-oracle.md)
+now replaces partial semantic acceptance with shared ordered byte comparison,
+normalizing only independently shaped generator identity/timestamp lines.
+The bounded wave/evidence below describes the preceding fail-closed replay wave,
+not the current comparator. Unchanged classic is now truthfully rejected with
+paired evidence; no prior partial PASS becomes a strict producer success.
+Inventory/default/domain/effective-config/all-plate coverage and legacy producer
+provenance remain unverified. ARD-0023 is unchanged.
+
 ## Unchanged user goal
 
 All 1,001 supported printer presets, with their real default process/filament

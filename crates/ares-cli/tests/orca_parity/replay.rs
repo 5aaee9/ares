@@ -1,4 +1,4 @@
-//! Cached project/reference replay, not a fresh Orca execution or full-output oracle.
+//! Strict comparison of cached project/reference streams, not a fresh Orca execution.
 //! Explicit requests require ARES_PARITY_REPLAY and external ARES_PARITY_ARTIFACT_ROOT.
 use std::path::{Path, PathBuf};
 
@@ -114,12 +114,12 @@ fn run(input: &Path) -> Result<(), String> {
         &serde_json::to_vec_pretty(&summary).map_err(|e| e.to_string())?,
     )?;
     eprintln!(
-        "partial semantic replay: {passing}/{} passed; report {report:?}",
+        "ordered byte replay (generator only): {passing}/{} passed; report {report:?}",
         cases.len()
     );
     if passing != cases.len() {
         return Err(format!(
-            "{} failed cases; NOT full-output parity; see {report:?}",
+            "{} failed cases; supplied streams do not match; see {report:?}",
             cases.len() - passing
         ));
     }

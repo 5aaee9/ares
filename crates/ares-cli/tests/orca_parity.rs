@@ -1,6 +1,6 @@
 //! OrcaSlicer parity suite: slices vendor printer profiles with both the
-//! OrcaSlicer 2.4.2 CLI and Ares and compares the G-code with the KSR
-//! semantic comparator (partial semantic evidence, NOT full-output parity).
+//! OrcaSlicer 2.4.2 CLI and Ares using the shared generator-only strict byte
+//! comparator. Equality of supplied streams does not establish inventory coverage.
 //!
 //! Environment-gated: runs only when `ARES_ORCA_BIN` (or the repository
 //! wrapper `scripts/orca-parity.sh`) names a working OrcaSlicer CLI.
@@ -22,6 +22,9 @@ mod smoke;
 #[path = "orca_parity/smoke_overrides.rs"]
 mod smoke_overrides;
 
+#[path = "ksr_fdmtest_v4/golden.rs"]
+mod golden;
+// Diagnostic-only semantic behavior tests; never a whole-output acceptance gate.
 #[path = "ksr_fdmtest_v4/semantic.rs"]
 mod semantic;
 
