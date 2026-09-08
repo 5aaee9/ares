@@ -60,9 +60,6 @@ pub(super) enum MotionKind {
     Regular,
     Unretract,
     ToolChange,
-    /// The pre-wipe inward move: carries time but no g1_times_cache entry
-    /// upstream (bilateral dump finding).
-    InwardMove,
 }
 
 pub(super) struct MotionBlock {
@@ -72,9 +69,8 @@ pub(super) struct MotionBlock {
     pub(super) centripetal_acceleration: f64,
     pub(super) jerk: [f64; 4],
     pub(super) direction: [f64; 4],
-    /// E-only moves time into the machine total but get no g1_times_cache
-    /// entry (`GCodeProcessor` pushes the cache per block only for
-    /// motion lines, so M73 emission skips retracts/unretracts).
+    /// Whether XYZ displacement is zero; cache eligibility also depends on
+    /// the upstream move classification and inserted seam vertex.
     pub(super) e_only: bool,
     pub(super) kind: MotionKind,
 }

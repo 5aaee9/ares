@@ -1,5 +1,8 @@
 //! `GCodeProcessor` motion accounting and exported progress-time lookup.
 
+mod seam;
+use seam::SeamDetector;
+
 use super::arc_accounting::arc_internal_g1_lines;
 use super::delays::command_delay;
 use super::motion::{MotionBlock, MotionKind, MotionState};
@@ -39,8 +42,11 @@ impl Estimate {
         let mut active_tool = None;
         let mut g1_line_id = 0;
         let mut block_line_ids = Vec::new();
+        let mut cache_eligible = Vec::new();
+        let mut seams = SeamDetector::default();
         let mut arc_segment_counts = vec![0; lines.len()];
         for (index, line) in lines.iter().enumerate() {
+            seams.role(line);
             match line.trim() {
                 "; WIPE_START" | ";WIPE_START" => state.set_wiping(true),
                 "; WIPE_END" | ";WIPE_END" => state.set_wiping(false),
@@ -92,6 +98,7 @@ impl Estimate {
                     kind: MotionKind::ToolChange,
                 });
                 block_line_ids.push(g1_line_id);
+                cache_eligible.push(false);
                 prepare_stages.push(prepare_stage);
                 events.push(FlushEvent {
                     block_count: blocks.len(),
@@ -104,19 +111,19 @@ impl Estimate {
             let command = code.split_whitespace().next().unwrap_or_default();
             let arc_internal = matches!(command, "G2" | "G3")
                 .then(|| arc_internal_g1_lines(code, command, &state));
-            let mut motion_blocks = state.motions(code);
-            // The G1 immediately preceding ;WIPE_START is the pre-wipe
-            // inward move — upstream keeps its time but drops its cache
-            // entry.
-            let inward_next = lines
-                .get(index + 1)
-                .is_some_and(|next| next.trim_start().starts_with(";WIPE_START"));
-            if inward_next {
-                for block in &mut motion_blocks {
-                    if !block.e_only {
-                        block.kind = MotionKind::InwardMove;
-                    }
-                }
+            let motion_blocks = state.motions(code);
+            for block in &motion_blocks {
+                let extruding = !state.wiping
+                    && block.direction[3] > 0.0
+                    && (block.direction[0] != 0.0 || block.direction[1] != 0.0);
+                let seam_vertex = if matches!(command, "G0" | "G1" | "G28") {
+                    seams.associate(extruding, state.position)
+                } else {
+                    // Arc seam discretization is outside this planar G1 slice.
+                    seams.advance(state.position);
+                    false
+                };
+                cache_eligible.push(!block.e_only && !seam_vertex);
             }
             match command {
                 "G0" | "G1" | "G28" => {
@@ -148,22 +155,12 @@ impl Estimate {
         let cache = block_line_ids
             .into_iter()
             .zip(&times)
-            .zip(blocks.iter().map(|block| block.e_only))
-            .zip(
-                blocks
-                    .iter()
-                    .map(|block| block.kind == MotionKind::InwardMove),
-            )
-            .filter_map(|(((id, time), e_only), inward)| {
+            .zip(cache_eligible)
+            .filter_map(|((id, time), eligible)| {
+                // calculate_time adds every block's time before testing the
+                // associated move vertex for Extrude, Travel or Wipe.
                 cumulative += time;
-                // E-only moves time into the total but get no g1_times_cache
-                // entry, so M73 emission skips retract/unretract lines
-                // (mirrors the GT dump behavior). The pre-wipe inward move
-                // also gets no cache entry upstream (verified via the
-                // ORCA_DUMP_LINES/ORCA_DUMP_MTYPE bilateral dumps: all 62
-                // wipe-tail travels vanish from the g1_times_cache while
-                // their time still counts).
-                (!e_only && !inward).then_some((id, cumulative))
+                eligible.then_some((id, cumulative))
             })
             .collect::<Vec<_>>();
         let mut elapsed = vec![None; lines.len() + 1];

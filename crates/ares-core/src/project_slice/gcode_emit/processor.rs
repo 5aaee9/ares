@@ -116,4 +116,6 @@ fn is_progress_motion(line: &str) -> bool {
 }
 
 #[cfg(test)]
+mod seam_tests;
+#[cfg(test)]
 mod tests;
