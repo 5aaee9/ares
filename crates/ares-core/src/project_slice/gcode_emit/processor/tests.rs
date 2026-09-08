@@ -100,6 +100,62 @@ fn bbl_g29_counts_the_bed_leveling_delay_only_inside_m622_j1() {
 }
 
 #[test]
+fn g4_dwell_s_word_adds_seconds_to_the_total_time() {
+    // OrcaSlicer/src/libslic3r/GCode/GCodeProcessor.cpp:4848-4856: process_G4
+    // passes S seconds to simulate_st_synchronize.
+    let plain = ["M204 S1000", "G1 X600 F3600", "G1 X1200 F3600"].map(str::to_owned);
+    let dwell = ["M204 S1000", "G1 X600 F3600", "G4 S10", "G1 X1200 F3600"].map(str::to_owned);
+    let plain = Estimate::from_lines(&plain, 0.0, nonbinding_axis_limits());
+    let dwell = Estimate::from_lines(&dwell, 0.0, nonbinding_axis_limits());
+
+    assert!(
+        (dwell.total - plain.total - 10.0).abs() < 1e-6,
+        "{}",
+        dwell.total
+    );
+}
+
+#[test]
+fn g4_dwell_p_word_counts_milliseconds_and_s_takes_precedence() {
+    let p = ["M204 S1000", "G1 X600 F3600", "G4 P500", "G1 X1200 F3600"].map(str::to_owned);
+    let s_and_p = [
+        "M204 S1000",
+        "G1 X600 F3600",
+        "G4 S10 P500",
+        "G1 X1200 F3600",
+    ]
+    .map(str::to_owned);
+
+    let p = Estimate::from_lines(&p, 0.0, nonbinding_axis_limits());
+    let s_and_p = Estimate::from_lines(&s_and_p, 0.0, nonbinding_axis_limits());
+
+    // process_G4's has_value('S') || has_value('P') short-circuits, so a
+    // parseable S suppresses the P lookup entirely. The 2e-6 tolerance covers
+    // the f32 block-time attribution of the appended dwell seconds.
+    assert!((p.total - 20.543348).abs() < 2e-6, "{}", p.total);
+    assert!(
+        (s_and_p.total - 30.043348).abs() < 2e-6,
+        "{}",
+        s_and_p.total
+    );
+}
+
+#[test]
+fn g4_dwell_shifts_progress_markers_and_the_total_footer() {
+    let output = b"; estimated printing time (normal mode) = 0s\n; estimated first layer printing time (normal mode) = 0s\nM73 P0 R0\nM204 S1000\nG1 X600 F3600\nG4 S10\nG1 X1200 F3600\nM73 P100 R0\n"
+        .to_vec();
+
+    let output =
+        String::from_utf8(process(output, true, 0.0, 0.0, nonbinding_axis_limits())).unwrap();
+
+    assert!(output.contains("G1 X1200 F3600\nM73 P66 R0\n"), "{output}");
+    assert!(
+        output.contains("; estimated printing time (normal mode) = 30s"),
+        "{output}"
+    );
+}
+
+#[test]
 fn preparation_time_ends_at_first_print_feature() {
     let output = b"; model printing time: 0s; total estimated time: 0s\n; estimated first layer printing time (normal mode) = 0s\nM73 P0 R0\n; FEATURE: Custom\nM204 S1000\nG1 X600 F3600\n; FEATURE: Inner wall\nG1 X1200 F3600\nM73 P100 R0\n".to_vec();
 
