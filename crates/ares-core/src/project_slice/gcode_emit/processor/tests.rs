@@ -2,12 +2,21 @@ use super::estimate::Estimate;
 use super::motion::{MotionBlock, MotionState, planned_times};
 use super::{ProcessorLimits, process};
 
+// Synthetic timing tests isolate other behavior with nonbinding axis caps;
+// zero is a real acceleration limit, not an unlimited sentinel.
+fn nonbinding_axis_limits() -> ProcessorLimits {
+    ProcessorLimits {
+        max_acceleration: [f64::MAX; 4],
+        ..ProcessorLimits::default()
+    }
+}
+
 // The synthetic footer fixtures use the BBL placeholder set; the end-to-end
 // suite covers the compatible set via Orca parity.
 fn bbl_limits() -> ProcessorLimits {
     ProcessorLimits {
         bbl_printer: true,
-        ..ProcessorLimits::default()
+        ..nonbinding_axis_limits()
     }
 }
 
@@ -27,7 +36,7 @@ fn rewrites_compatible_time_footer_for_non_bbl_printers() {
         .to_vec();
 
     let output =
-        String::from_utf8(process(output, true, 0.0, 0.0, ProcessorLimits::default())).unwrap();
+        String::from_utf8(process(output, true, 0.0, 0.0, nonbinding_axis_limits())).unwrap();
 
     assert!(
         output.contains("; estimated printing time (normal mode) = 1m 40s"),
@@ -72,7 +81,7 @@ fn non_bbl_g29_counts_the_bed_leveling_delay_without_m622_markers() {
         .to_vec();
 
     let output =
-        String::from_utf8(process(output, true, 0.0, 0.0, ProcessorLimits::default())).unwrap();
+        String::from_utf8(process(output, true, 0.0, 0.0, nonbinding_axis_limits())).unwrap();
 
     assert!(output.contains("M73 P0 R4\n"), "{output}");
 }
@@ -104,7 +113,10 @@ fn preparation_time_ends_at_first_print_feature() {
 
 #[test]
 fn collinear_cruise_time_is_not_zeroed_by_default_jerk() {
-    let mut state = MotionState::default();
+    let mut state = MotionState {
+        max_acceleration: [f64::MAX; 4],
+        ..MotionState::default()
+    };
     state.motion("M204 S1000");
     let first = state.motion("G1 X600 F3600").unwrap();
     let second = state.motion("G1 X1200 F3600").unwrap();
@@ -166,7 +178,10 @@ fn m204_updates_respect_machine_acceleration_envelopes() {
 
 #[test]
 fn travel_blocks_retain_print_acceleration_for_centripetal_limits() {
-    let mut state = MotionState::default();
+    let mut state = MotionState {
+        max_acceleration: [f64::MAX; 4],
+        ..MotionState::default()
+    };
     state.motion("M204 P500 T10000");
 
     let block = state.motion("G1 X10 F6000").unwrap();
@@ -244,7 +259,7 @@ fn isolated_block_uses_firmware_safe_entry_speed() {
 fn single_block_synchronization_waits_for_next_motion() {
     let lines = ["M204 S1000", "G1 X600 F3600", "M1", "G1 X1200 F3600"].map(str::to_owned);
 
-    let estimate = Estimate::from_lines(&lines, 0.0, ProcessorLimits::default());
+    let estimate = Estimate::from_lines(&lines, 0.0, nonbinding_axis_limits());
 
     assert!(
         (estimate.total - 20.043348).abs() < 1e-6,
@@ -298,7 +313,7 @@ fn homing_command_emits_motion_to_requested_axes() {
 fn homing_motion_contributes_to_total_estimate() {
     let lines = ["G1 X10 F600", "G28 X"].map(str::to_owned);
 
-    let estimate = Estimate::from_lines(&lines, 0.0, ProcessorLimits::default());
+    let estimate = Estimate::from_lines(&lines, 0.0, nonbinding_axis_limits());
 
     assert!(
         (estimate.total - 2.000_159_978_866_577).abs() < 1e-9,
@@ -346,7 +361,7 @@ fn progress_skips_e_only_retract_lines() {
     let output = b"M73 P0 R0\nG1 X100 F600\nG1 E-5 F300\nG1 Z.8 F600\nM73 P100 R0\n".to_vec();
 
     let output =
-        String::from_utf8(process(output, true, 0.0, 0.0, ProcessorLimits::default())).unwrap();
+        String::from_utf8(process(output, true, 0.0, 0.0, nonbinding_axis_limits())).unwrap();
 
     assert!(output.contains("G1 E-5 F300\nM73 P"), "{output}");
     // the only M73 after Z.8 is the final P100 placeholder, so no emission

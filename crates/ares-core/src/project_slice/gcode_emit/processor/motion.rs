@@ -1,4 +1,6 @@
 mod arc;
+#[cfg(test)]
+mod axis_acceleration_tests;
 mod limits;
 use super::motion_util::{assignment, clamp, clamped_word, norm, scale, word};
 use crate::options::GCodeFlavor;
@@ -308,14 +310,12 @@ impl MotionState {
                 speed = speed.min(max_feedrate / ratio);
             }
             let max_acceleration = self.max_acceleration[axis];
-            if max_acceleration > 0.0 {
-                acceleration = acceleration.min(max_acceleration / ratio);
-            }
+            acceleration = acceleration.min(max_acceleration / ratio);
         }
         Some(MotionBlock {
             distance,
             speed,
-            acceleration: acceleration.max(1.0),
+            acceleration,
             centripetal_acceleration: self.acceleration.max(1.0),
             jerk: self.effective_jerk(),
             direction: scale(delta, 1.0 / distance),
@@ -354,14 +354,12 @@ impl MotionState {
                 speed = speed.min(max_feedrate / ratio);
             }
             let max_acceleration = self.max_acceleration[axis];
-            if max_acceleration > 0.0 {
-                acceleration = acceleration.min(max_acceleration / ratio);
-            }
+            acceleration = acceleration.min(max_acceleration / ratio);
         }
         Some(MotionBlock {
             distance,
             speed,
-            acceleration: acceleration.max(1.0),
+            acceleration,
             centripetal_acceleration: self.acceleration.max(1.0),
             jerk: self.effective_jerk(),
             direction: scale(delta, 1.0 / distance),

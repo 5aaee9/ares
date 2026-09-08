@@ -107,3 +107,75 @@ and `ARES_ENVELOPE_OUTPUT=$PWD/evidence/replay`, using the nextest command above
 All artifacts are diagnostic/test-only; production has no FS/env hook. These
 classic-normalized smoke inputs are not all1001 actual-default printer coverage.
 Independent six-axis review/publication remains Coordinator-owned.
+
+## P1 correction plan: zero and sub-unit axis acceleration
+
+Source: `GCodeProcessor.cpp:4066–4073` clamps each moving axis even when
+its configured acceleration is zero and stores block acceleration without a
+unit floor; `PrintConfig.cpp:4529–4548` declares axis acceleration coFloats with
+minimum zero. `get_option_value` returns zero for empty arrays. Destination:
+`processor/motion.rs` linear and segmented block construction only; libvgcode
+has no ownership in this correction.
+
+Before production changes:
+1. Add separate behavioral tests through `ProcessorLimits::from_config` for
+   zero/sub-unit Z limits on linear and helical arc moves, plus empty Z arrays.
+   Execute them RED against the envelope candidate at `82694b4c`.
+2. Remove the positive-only axis clamp gate and block acceleration unit floor
+   in both constructors. Do not change centripetal acceleration, scheduling,
+   cache, emission, seams, command parsing, comparator or reference bytes.
+3. Re-run focused/envelope/core nextest, explicit complete envelope replays,
+   fmt/clippy and browser WASM compile checks in an owned target (900s bounds).
+   Afinia must stay byte-exact; retain and compare full Artillery residual bytes.
+   Record any regression rather than widening scope; only commit verified work.
+
+Supervisor-approved test setup correction after the first focused run:
+13 existing synthetic timing tests relied on zero axis defaults meaning
+unlimited. Give only those setups explicit nonbinding positive axis limits,
+without changing their assertions or fixture bytes. Move the new tests into a
+separate motion child module to derive exact arc expectations from source
+segment deltas (division versus separately rounded direction multiplication),
+not tolerance or magic ULP values. Production defaults and planner stay intact.
+
+### Correction validation
+
+Evidence: owned `evidence/accel-zero/`, target `target/accel-zero`; every Cargo
+validation command bounded by `timeout 900`. New separate tests cover zero and
+0.5 Z acceleration in linear blocks and helical arc segments, and empty Z arrays
+in both constructors. Existing assertions, comparator and reference bytes are
+unchanged. Touched Rust files are 374, 370 and 78 physical lines.
+
+- TDD `cargo nextest run -p ares-core -E 'test(axis_acceleration_tests)'
+  --no-fail-fast`: exit100, all five RED before production changes (zero yielded
+  1250; sub-unit yielded 1). First post-fix focused run exposed 13 synthetic
+  setup regressions and the exact arc expectation rounding issue, retained in
+  `focused.log`; the supervisor approved the test-only corrections above.
+- Baseline core before correction: exit0, 6805/6805. Baseline production rerun
+  with corrected synthetic setups: exit0, 6805/6805. Final `cargo nextest run
+  -p ares-core --no-fail-fast`: exit0, 6810/6810, three ignored tests not credited.
+- Final `cargo nextest run -p ares-core -E 'test(gcode_emit::processor)'
+  --no-fail-fast`: exit0, 47/47, including eight envelope unit tests and all five
+  new axis tests.
+- Explicit replay command from above with `--no-fail-fast`: baseline and final
+  exit100, Afinia and anchor PASS, Artillery unchanged RED at byte2665/line149.
+  Full input/actual/expected files are retained in `baseline-replay/` and
+  `final-replay/`. `cmp` of baseline/final complete actual bytes exits0 for all
+  three, not merely their first differences. Afinia actual/reference `cmp`
+  exits0; both SHA256 are
+  `6cb5cc59480e0bafbdda8d862477f49b31232f1c139599e5b63da0c9a56ee6e7`.
+  Artillery actual SHA256 before/after is
+  `54de7c4cc5847ea4381776a52c8e03c972057fe8a3415ac2d543a8267dc75c18`.
+- `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets`, and
+  `cargo check --target wasm32-unknown-unknown -p ares-core -p ares-wasm
+  -p ares-vgcode`: exit0 each. Existing clippy warnings remain; no browser or
+  Windows/macOS runtime execution or fresh AppImage slicing in this correction.
+
+Search found no production caller relying on default zero axes as unlimited:
+`ProcessorLimits::default` is test-only; `MotionState::with_limits` overwrites
+all axis defaults from config. Existing downstream planner zero-acceleration
+arithmetic can produce NaN (observed with the old synthetic zero setups);
+changing that arithmetic is explicitly outside this block-construction fix.
+Zero-axis full timing parity is therefore not claimed. Artillery and the full
+all1001/options/artifacts/Tier1 goal remain incomplete; no failed, ignored or
+unexecuted case is credited as parity. Independent review/publication remains
+Coordinator-owned.
