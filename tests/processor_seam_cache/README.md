@@ -16,6 +16,13 @@ complete effective config: Marlin2, 1100 print/retract/travel acceleration,
 0.01 junction deviation, zero filament-load delay. Other selected options and
 all generated commands remain in the artifacts, not normalized away.
 
+The fixture-local `.gitattributes` preserves verbatim G-code data, including
+checkout newline bytes: `-text` disables Git newline conversion. The local
+whitespace setting permits captured trailing whitespace and blank EOF lines;
+never trim or normalize these bytes. Ordinary text diffs remain visible, and
+source/docs whitespace checks outside `*.gcode` in this directory are unchanged.
+This data policy also covers the exact `classification-injected.gcode` bytes.
+
 `classification.3mf` derives from the same anchor by appending exactly
 `classification-injected.gcode` to `machine_start_gcode` in
 `Metadata/project_settings.config` (all other archive entry contents and config

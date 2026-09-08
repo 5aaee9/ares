@@ -112,18 +112,19 @@ impl Estimate {
             let arc_internal = matches!(command, "G2" | "G3")
                 .then(|| arc_internal_g1_lines(code, command, &state));
             let motion_blocks = state.motions(code);
-            for block in &motion_blocks {
+            // Linear commands produce at most one block; only arcs subdivide.
+            if matches!(command, "G0" | "G1" | "G28")
+                && let Some(block) = motion_blocks.first()
+            {
                 let extruding = !state.wiping
                     && block.direction[3] > 0.0
                     && (block.direction[0] != 0.0 || block.direction[1] != 0.0);
-                let seam_vertex = if matches!(command, "G0" | "G1" | "G28") {
-                    seams.associate(extruding, state.position)
-                } else {
-                    // Arc seam discretization is outside this planar G1 slice.
-                    seams.advance(state.position);
-                    false
-                };
+                let seam_vertex = seams.associate(extruding, state.position);
                 cache_eligible.push(!block.e_only && !seam_vertex);
+            } else if !motion_blocks.is_empty() {
+                // Arc seam discretization is outside this planar G1 slice.
+                seams.advance(state.position);
+                cache_eligible.extend(motion_blocks.iter().map(|block| !block.e_only));
             }
             match command {
                 "G0" | "G1" | "G28" => {

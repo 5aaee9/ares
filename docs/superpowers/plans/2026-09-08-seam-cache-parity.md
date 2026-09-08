@@ -41,3 +41,18 @@ fill, scheduler, rounding, E-state or option-harness edits are authorized.
   double-time instrumentation is claimed. Scheduler/arithmetic are unchanged.
 - Reproduction script and exact fixture/patch identities are committed under
   `tests/processor_seam_cache`; full run evidence is in the wave6 evidence root.
+
+## Pre-publication fixture/lint follow-up
+
+Keep the same included/deferred source boundary. Add only fixture-local Git
+attributes to preserve verbatim G-code checkout bytes and exempt the captured
+trailing whitespace from diagnostics, without hiding ordinary diffs. Flatten
+cache-association control flow using the existing invariant that linear motion
+produces at most one block; do not change detector, timing or counter semantics.
+
+Verify all six G-code files against the original manifest, committed/staged
+blobs and retained captures. Rerun the 33 existing processor tests (including
+five byte goldens), compare before/after output exactly, verify fmt/clippy and
+absence of the two new nesting warnings, and repeat the approved external
+integration script. Preserve the old commit/evidence and fast-forward the local
+candidate with one follow-up commit only after these checks pass.
