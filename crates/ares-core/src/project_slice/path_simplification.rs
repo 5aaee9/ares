@@ -7,6 +7,7 @@ use crate::{
             IslandPrintEntity, OrderedExtrusionLayer, PreparedPostIslandPrintOrder,
         },
         perimeters::classic::{
+            entity_collections::ExtrusionEntity,
             gap_extrusion::GapFillEntity,
             materialize::{ExtrusionPath, Point3, Polyline3},
         },
@@ -44,7 +45,13 @@ fn simplify_layers(layers: &mut [OrderedExtrusionLayer], scale: CoordinateScale,
                 for path in collection
                     .entities
                     .iter_mut()
-                    .flat_map(|entity| &mut entity.extrusion_loop.paths)
+                    // `LayerRegion::simplify_multi_path` simplifies each
+                    // sub-path exactly like a loop sub-path
+                    // (`LayerRegion.cpp:1089-1125`).
+                    .flat_map(|entity| match entity {
+                        ExtrusionEntity::Loop(ordered) => &mut ordered.extrusion_loop.paths,
+                        ExtrusionEntity::MultiPath(multi_path) => &mut multi_path.paths,
+                    })
                 {
                     simplify_path3(path, scale, tolerance);
                 }

@@ -3,7 +3,7 @@ use crate::{
     project_slice::perimeters::{
         classic::{
             chained_loops::ExtrusionLoopRole,
-            entity_collections::{ExtrusionEntityCollection, OrderedExtrusionLoop},
+            entity_collections::{ExtrusionEntity, ExtrusionEntityCollection},
             gap_domain,
             materialize::{ExtrusionPath, ExtrusionRole},
             perimeter_append::{
@@ -220,18 +220,22 @@ fn brim_type_code(brim_type: ProcessBrimType) -> i128 {
     }
 }
 
-fn checksum_entity(checksum: &mut i128, entity: &OrderedExtrusionLoop) {
-    mix(checksum, i128::from(entity.inset_idx));
+fn checksum_entity(checksum: &mut i128, entity: &ExtrusionEntity) {
+    let ordered = match entity {
+        ExtrusionEntity::Loop(ordered) => ordered,
+        ExtrusionEntity::MultiPath(_) => panic!("classic traversal emits loop entities"),
+    };
+    mix(checksum, i128::from(ordered.inset_idx));
     mix(
         checksum,
-        match entity.extrusion_loop.role {
+        match ordered.extrusion_loop.role {
             ExtrusionLoopRole::Internal => 1,
             ExtrusionLoopRole::Default => 2,
             ExtrusionLoopRole::Hole => 3,
         },
     );
-    mix(checksum, entity.extrusion_loop.paths.len() as i128);
-    for path in &entity.extrusion_loop.paths {
+    mix(checksum, ordered.extrusion_loop.paths.len() as i128);
+    for path in &ordered.extrusion_loop.paths {
         checksum_path(checksum, path);
     }
 }

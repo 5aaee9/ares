@@ -3,6 +3,7 @@ use crate::{
     project_slice::perimeters::{
         classic::{
             chained_loops::ExtrusionLoopRole,
+            entity_collections::ExtrusionEntity,
             gap_extrusion::GapFillEntity,
             materialize::{ExtrusionPath, ExtrusionRole},
         },
@@ -115,17 +116,21 @@ fn checksum_record(checksum: &mut i128, record: &PreparedLayerRegionPerimeterRec
         mix(checksum, collection.entities.len() as i128);
         for entity in &collection.entities {
             mix(checksum, LOOP);
-            mix(checksum, i128::from(entity.inset_idx));
+            let ordered = match entity {
+                ExtrusionEntity::Loop(ordered) => ordered,
+                ExtrusionEntity::MultiPath(_) => panic!("classic traversal emits loop entities"),
+            };
+            mix(checksum, i128::from(ordered.inset_idx));
             mix(
                 checksum,
-                match entity.extrusion_loop.role {
+                match ordered.extrusion_loop.role {
                     ExtrusionLoopRole::Internal => 1,
                     ExtrusionLoopRole::Default => 2,
                     ExtrusionLoopRole::Hole => 3,
                 },
             );
-            mix(checksum, entity.extrusion_loop.paths.len() as i128);
-            for path in &entity.extrusion_loop.paths {
+            mix(checksum, ordered.extrusion_loop.paths.len() as i128);
+            for path in &ordered.extrusion_loop.paths {
                 checksum_path(checksum, path);
             }
         }

@@ -75,7 +75,7 @@ fn perimeter_shape(prepared: &PreparedPostLayerRegionPerimeters) -> Vec<(usize, 
                 collection
                     .entities
                     .iter()
-                    .map(|entity| entity.inset_idx)
+                    .map(|entity| entity.inset_idx())
                     .collect(),
             )
         })

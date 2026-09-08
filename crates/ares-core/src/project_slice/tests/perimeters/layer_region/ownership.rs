@@ -2,7 +2,8 @@ use crate::{
     geometry::ExPolygon,
     project_slice::perimeters::{
         classic::{
-            entity_collections::ExtrusionEntityCollection, gap_extrusion::GapFillEntity,
+            entity_collections::{ExtrusionEntity, ExtrusionEntityCollection},
+            gap_extrusion::GapFillEntity,
             infill_boundary::PreparedInfillBoundaryObject,
         },
         layer_region, prepare_post_classic_infill_boundary,
@@ -133,10 +134,12 @@ fn output_perimeter_allocations(
 fn collection_allocations(collection: &ExtrusionEntityCollection) -> Vec<usize> {
     std::iter::once(collection.entities.as_ptr() as usize)
         .chain(collection.entities.iter().flat_map(|entity| {
-            std::iter::once(entity.extrusion_loop.paths.as_ptr() as usize).chain(
-                entity
-                    .extrusion_loop
-                    .paths
+            let paths = match entity {
+                ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+                ExtrusionEntity::MultiPath(_) => panic!("classic collections keep loop entities"),
+            };
+            std::iter::once(paths.as_ptr() as usize).chain(
+                paths
                     .iter()
                     .map(|path| path.polyline.points.as_ptr() as usize),
             )

@@ -1,7 +1,7 @@
 use crate::project_slice::perimeters::{
     classic::{
         chained_loops::ExtrusionLoopRole,
-        entity_collections::{OrderedExtrusionLoop, PreparedEntityCollectionRecord},
+        entity_collections::{ExtrusionEntity, PreparedEntityCollectionRecord},
         materialize::{ExtrusionPath, ExtrusionRole},
     },
     prepare_post_classic_entity_collections,
@@ -65,20 +65,24 @@ fn inspect_record(
 }
 
 fn inspect_entities(
-    entities: &[OrderedExtrusionLoop],
+    entities: &[ExtrusionEntity],
     entity_count: &mut usize,
     roles: &mut [usize; 3],
 ) {
     for entity in entities {
+        let ordered = match entity {
+            ExtrusionEntity::Loop(ordered) => ordered,
+            ExtrusionEntity::MultiPath(_) => panic!("classic traversal emits loop entities"),
+        };
         *entity_count += 1;
-        roles[match entity.extrusion_loop.role {
+        roles[match ordered.extrusion_loop.role {
             ExtrusionLoopRole::Internal => 0,
             ExtrusionLoopRole::Default => 1,
             ExtrusionLoopRole::Hole => 2,
         }] += 1;
-        assert!(!entity.extrusion_loop.paths.is_empty());
-        let first = entity.extrusion_loop.paths[0].polyline.points[0];
-        let last_path = entity.extrusion_loop.paths.last().unwrap();
+        assert!(!ordered.extrusion_loop.paths.is_empty());
+        let first = ordered.extrusion_loop.paths[0].polyline.points[0];
+        let last_path = ordered.extrusion_loop.paths.last().unwrap();
         assert_eq!(first, *last_path.polyline.points.last().unwrap());
     }
 }
@@ -107,20 +111,24 @@ fn accumulate_record(record: &PreparedEntityCollectionRecord, checksum: &mut i12
     }
 }
 
-fn accumulate_entities(entities: &[OrderedExtrusionLoop], checksum: &mut i128) {
+fn accumulate_entities(entities: &[ExtrusionEntity], checksum: &mut i128) {
     mix(checksum, entities.len() as i128);
     for entity in entities {
-        mix(checksum, i128::from(entity.inset_idx));
+        let ordered = match entity {
+            ExtrusionEntity::Loop(ordered) => ordered,
+            ExtrusionEntity::MultiPath(_) => panic!("classic traversal emits loop entities"),
+        };
+        mix(checksum, i128::from(ordered.inset_idx));
         mix(
             checksum,
-            match entity.extrusion_loop.role {
+            match ordered.extrusion_loop.role {
                 ExtrusionLoopRole::Internal => 1,
                 ExtrusionLoopRole::Default => 2,
                 ExtrusionLoopRole::Hole => 3,
             },
         );
-        mix(checksum, entity.extrusion_loop.paths.len() as i128);
-        for path in &entity.extrusion_loop.paths {
+        mix(checksum, ordered.extrusion_loop.paths.len() as i128);
+        for path in &ordered.extrusion_loop.paths {
             accumulate_path(path, checksum);
         }
     }

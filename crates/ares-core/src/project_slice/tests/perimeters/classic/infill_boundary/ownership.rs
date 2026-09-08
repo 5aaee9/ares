@@ -1,5 +1,6 @@
 use crate::project_slice::perimeters::{
     classic::{
+        entity_collections::ExtrusionEntity,
         gap_extrusion::{GapFillEntity, PreparedGapExtrusionSurface},
         infill_boundary,
     },
@@ -99,10 +100,14 @@ fn collection_allocations(
         |collection| {
             std::iter::once(collection.entities.as_ptr() as usize).chain(
                 collection.entities.iter().flat_map(|entity| {
-                    std::iter::once(entity.extrusion_loop.paths.as_ptr() as usize).chain(
-                        entity
-                            .extrusion_loop
-                            .paths
+                    let paths = match entity {
+                        ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+                        ExtrusionEntity::MultiPath(_) => {
+                            panic!("classic collections keep loop entities")
+                        }
+                    };
+                    std::iter::once(paths.as_ptr() as usize).chain(
+                        paths
                             .iter()
                             .map(|path| path.polyline.points.as_ptr() as usize),
                     )

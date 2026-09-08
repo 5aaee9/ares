@@ -8,10 +8,14 @@ mod traverse;
 mod types;
 
 pub(in crate::project_slice) use types::{
-    ExtrusionEntityCollection, OrderedExtrusionLoop, PreparedEntityCollectionObject,
+    ExtrusionEntity, ExtrusionEntityCollection, PreparedEntityCollectionObject,
     PreparedEntityCollectionRecord, PreparedEntityCollectionSurface,
     PreparedPostClassicEntityCollections,
 };
+// The multi-path vocabulary is test-constructed until the arachne
+// materialization seam builds real entities.
+#[cfg_attr(not(test), allow(unused_imports))]
+pub(in crate::project_slice) use types::{ExtrusionMultiPath, OrderedExtrusionLoop};
 
 use super::{
     chained_loops::{

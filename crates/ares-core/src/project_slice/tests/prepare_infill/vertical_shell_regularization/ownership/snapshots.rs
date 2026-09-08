@@ -1,5 +1,6 @@
 use crate::{
     geometry::Polygon,
+    project_slice::perimeters::classic::entity_collections::ExtrusionEntity,
     project_slice::prepare_infill::{
         vertical_shell_projection::types::VerticalShellProjectionObject,
         vertical_shell_regularization::types::VerticalShellRegularizationObject,
@@ -74,7 +75,10 @@ pub(in crate::project_slice::tests::prepare_infill) fn all_predecessor_points(
                 .perimeters
                 .iter()
                 .flat_map(|collection| &collection.entities)
-                .flat_map(|entity| &entity.extrusion_loop.paths)
+                .flat_map(|entity| match entity {
+                    ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+                    ExtrusionEntity::MultiPath(multi_path) => &multi_path.paths,
+                })
                 .map(|path| path.polyline.points.as_ptr() as usize),
         );
         for surface in record.slices.iter().chain(&record.fill_surfaces) {

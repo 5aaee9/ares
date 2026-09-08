@@ -126,8 +126,7 @@ fn assign_layer(layer: &mut LayerFillEntities, slices: &[ExPolygon]) -> LayerExt
     let perimeters = std::mem::take(&mut layer.perimeters);
     for (source_order, mut perimeter) in perimeters.into_iter().enumerate() {
         perimeter.source_order = source_order;
-        let path = &perimeter.entities[0].extrusion_loop.paths[0];
-        let first = path.polyline.points[0];
+        let first = *perimeter.entities[0].first_point3();
         let island = island_index(Point::new(first.x, first.y), slices, &bounds, &order);
         islands[island].perimeters.push(perimeter);
     }

@@ -7,6 +7,7 @@ use crate::{
         island_print_order::{IslandPrintEntity, OrderedExtrusionLayer},
         perimeters::classic::{
             chained_loops::ExtrusionLoop,
+            entity_collections::ExtrusionEntity,
             materialize::{ExtrusionRole, Point3},
             traversal::ClassicTraversalRecord,
         },
@@ -67,7 +68,15 @@ pub(super) fn stagger_inner_seams(
             _ => None,
         })
         .flat_map(|collection| &mut collection.entities)
-        .map(|entity| &mut entity.extrusion_loop)
+        .map(|entity| match entity {
+            // Staggered inner-wall seam splitting targets loops; arachne wall
+            // generation stays typed-rejected before materialization, so no
+            // multi-path can reach staggering.
+            ExtrusionEntity::Loop(ordered) => &mut ordered.extrusion_loop,
+            ExtrusionEntity::MultiPath(_) => unreachable!(
+                "multi-path seam staggering lands with the arachne materialization seam"
+            ),
+        })
     {
         if let Some(target) = stagger_target(loop_, scale) {
             split_at(loop_, target, scale);
@@ -112,7 +121,12 @@ pub(super) fn prepared_cw_rectangles_have_source_seams(layers: &[OrderedExtrusio
             _ => None,
         })
         .flat_map(|collection| &collection.entities)
-        .map(|entity| &entity.extrusion_loop)
+        .map(|entity| match entity {
+            ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop,
+            ExtrusionEntity::MultiPath(_) => unreachable!(
+                "multi-path seam staggering lands with the arachne materialization seam"
+            ),
+        })
     {
         found = true;
         if !is_closed_axis_rectangle(loop_) {

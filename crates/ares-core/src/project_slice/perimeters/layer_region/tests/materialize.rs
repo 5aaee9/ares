@@ -4,7 +4,9 @@ use crate::{
         perimeters::{
             classic::{
                 chained_loops::{ExtrusionLoop, ExtrusionLoopRole},
-                entity_collections::{ExtrusionEntityCollection, OrderedExtrusionLoop},
+                entity_collections::{
+                    ExtrusionEntity, ExtrusionEntityCollection, OrderedExtrusionLoop,
+                },
                 gap_extrusion::{GapFillCollection, GapFillEntity, PreparedGapExtrusionSurface},
                 infill_boundary::PreparedInfillBoundaryRecord,
                 materialize::{ExtrusionPath, ExtrusionRole, Point3, Polyline3},
@@ -61,10 +63,13 @@ fn task22o16_materializes_five_fields_in_source_append_order_and_moves_nested_st
             (
                 collection.entities.as_ptr(),
                 collection.entities.first().map(|entity| {
-                    (
-                        entity.extrusion_loop.paths.as_ptr(),
-                        entity.extrusion_loop.paths[0].polyline.points.as_ptr(),
-                    )
+                    let paths = match entity {
+                        ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+                        ExtrusionEntity::MultiPath(_) => {
+                            panic!("classic append keeps loop entities")
+                        }
+                    };
+                    (paths.as_ptr(), paths[0].polyline.points.as_ptr())
                 }),
             )
         })
@@ -112,7 +117,7 @@ fn task22o16_materializes_five_fields_in_source_append_order_and_moves_nested_st
             .perimeters
             .iter()
             .filter_map(|collection| collection.entities.first())
-            .map(|entity| entity.inset_idx)
+            .map(|entity| entity.inset_idx())
             .collect::<Vec<_>>(),
         [10, 30]
     );
@@ -128,7 +133,7 @@ fn task22o16_materializes_five_fields_in_source_append_order_and_moves_nested_st
             .collect::<Vec<_>>(),
         [vec![400], vec![500, 600]]
     );
-    let first_loop = &output.perimeters[0].entities[0].extrusion_loop;
+    let first_loop = collection_loop(&output.perimeters[0], 0);
     assert_eq!(first_loop.role, ExtrusionLoopRole::Internal);
     assert_eq!(
         (
@@ -139,7 +144,7 @@ fn task22o16_materializes_five_fields_in_source_append_order_and_moves_nested_st
         ),
         (ExtrusionRole::Perimeter, 1.0, 0.1, 0.2)
     );
-    let final_path = &output.perimeters[2].entities[0].extrusion_loop.paths[0];
+    let final_path = &collection_loop(&output.perimeters[2], 0).paths[0];
     assert_eq!(
         (final_path.role, final_path.mm3_per_mm, final_path.width),
         (ExtrusionRole::ExternalPerimeter, 3.0, 0.3)
@@ -159,11 +164,12 @@ fn task22o16_materializes_five_fields_in_source_append_order_and_moves_nested_st
     for (collection, expected) in output.perimeters.iter().zip(perimeter_allocations) {
         assert_eq!(collection.entities.as_ptr(), expected.0);
         if let (Some(entity), Some((paths, points))) = (collection.entities.first(), expected.1) {
-            assert_eq!(entity.extrusion_loop.paths.as_ptr(), paths);
-            assert_eq!(
-                entity.extrusion_loop.paths[0].polyline.points.as_ptr(),
-                points
-            );
+            let entity_paths = match entity {
+                ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+                ExtrusionEntity::MultiPath(_) => panic!("classic append keeps loop entities"),
+            };
+            assert_eq!(entity_paths.as_ptr(), paths);
+            assert_eq!(entity_paths[0].polyline.points.as_ptr(), points);
         }
     }
     for (entity, (paths, points)) in output.thin_fills.iter().zip(gap_allocations) {
@@ -253,16 +259,25 @@ fn surface(
     }
 }
 
+fn collection_loop(collection: &ExtrusionEntityCollection, index: usize) -> &ExtrusionLoop {
+    match &collection.entities[index] {
+        ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop,
+        ExtrusionEntity::MultiPath(_) => panic!("classic append keeps loop entities"),
+    }
+}
+
 fn collection(inset_idx: i32, paths: Vec<ExtrusionPath>) -> ExtrusionEntityCollection {
     ExtrusionEntityCollection {
         entities: paths
             .into_iter()
-            .map(|path| OrderedExtrusionLoop {
-                extrusion_loop: ExtrusionLoop {
-                    paths: vec![path],
-                    role: ExtrusionLoopRole::Internal,
-                },
-                inset_idx,
+            .map(|path| {
+                ExtrusionEntity::Loop(OrderedExtrusionLoop {
+                    extrusion_loop: ExtrusionLoop {
+                        paths: vec![path],
+                        role: ExtrusionLoopRole::Internal,
+                    },
+                    inset_idx,
+                })
             })
             .collect(),
         source_order: 0,

@@ -1,8 +1,17 @@
 use crate::project_slice::{
     fill_entities::{self, FillExtrusionEntity},
-    perimeters::classic::gap_extrusion::GapFillEntity,
+    perimeters::classic::{entity_collections::ExtrusionEntity, gap_extrusion::GapFillEntity},
     tests::prepare_infill::group_fills::focused::fixture::graph,
 };
+
+fn entity_sub_paths(
+    entity: &ExtrusionEntity,
+) -> &[crate::project_slice::perimeters::classic::materialize::ExtrusionPath] {
+    match entity {
+        ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+        ExtrusionEntity::MultiPath(multi_path) => &multi_path.paths,
+    }
+}
 
 #[test]
 fn task22o91_stage_materializes_all_objects_and_layers_in_order() {
@@ -55,12 +64,12 @@ fn task22o91_stage_materializes_all_objects_and_layers_in_order() {
                 counts.2 += collection
                     .entities
                     .iter()
-                    .map(|entity| entity.extrusion_loop.paths.len())
+                    .map(|entity| entity_sub_paths(entity).len())
                     .sum::<usize>();
                 counts.3 += collection
                     .entities
                     .iter()
-                    .flat_map(|entity| &entity.extrusion_loop.paths)
+                    .flat_map(entity_sub_paths)
                     .map(|path| path.polyline.points.len())
                     .sum::<usize>();
                 counts

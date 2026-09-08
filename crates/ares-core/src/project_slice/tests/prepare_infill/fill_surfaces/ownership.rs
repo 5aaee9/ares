@@ -1,5 +1,6 @@
 use crate::project_slice::{
     perimeters,
+    perimeters::classic::entity_collections::ExtrusionEntity,
     prepare_infill::{fill_surfaces, surface_type_detection},
     region_slices::RegionSurface,
     tests::support::KsrArchive,
@@ -45,11 +46,12 @@ fn record_allocations(
             collection.entities.len(),
         ]);
         for entity in &collection.entities {
-            output.extend([
-                entity.extrusion_loop.paths.as_ptr() as usize,
-                entity.extrusion_loop.paths.len(),
-            ]);
-            for path in &entity.extrusion_loop.paths {
+            let paths = match entity {
+                ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+                ExtrusionEntity::MultiPath(_) => panic!("classic collections keep loop entities"),
+            };
+            output.extend([paths.as_ptr() as usize, paths.len()]);
+            for path in paths {
                 path_allocations(output, path);
             }
         }

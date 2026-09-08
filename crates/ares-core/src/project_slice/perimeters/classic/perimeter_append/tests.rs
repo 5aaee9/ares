@@ -1,7 +1,7 @@
 use super::{
     super::{
         chained_loops::{ExtrusionLoop, ExtrusionLoopRole},
-        entity_collections::{ExtrusionEntityCollection, OrderedExtrusionLoop},
+        entity_collections::{ExtrusionEntity, ExtrusionEntityCollection, OrderedExtrusionLoop},
         materialize::{ExtrusionPath, ExtrusionRole, Point3, Polyline3},
         traversal::{ClassicTraversalRecord, InactiveOverhangReverse, PendingPathBranch},
     },
@@ -25,14 +25,19 @@ fn task22o10_empty_collection_is_not_appended() {
 #[test]
 fn wall_sequences_reorder_inset_indices_like_orca() {
     let source = || ExtrusionEntityCollection {
-        entities: vec![entity(30, 3), entity(20, 2), entity(10, 1), entity(0, 0)],
+        entities: vec![
+            ExtrusionEntity::Loop(entity(30, 3)),
+            ExtrusionEntity::Loop(entity(20, 2)),
+            ExtrusionEntity::Loop(entity(10, 1)),
+            ExtrusionEntity::Loop(entity(0, 0)),
+        ],
         source_order: 0,
     };
     let indices = |collection: &ExtrusionEntityCollection| {
         collection
             .entities
             .iter()
-            .map(|entity| entity.inset_idx)
+            .map(|entity| entity.inset_idx())
             .collect::<Vec<_>>()
     };
 
@@ -52,17 +57,17 @@ fn wall_sequences_reorder_inset_indices_like_orca() {
 #[test]
 fn task22o10_nonempty_collection_keeps_nested_boundary_order_and_allocations() {
     let collection = collection();
-    let allocation = collection.entities[0].extrusion_loop.paths[0]
+    let allocation = collection_loop(&collection, 0).paths[0]
         .polyline
         .points
         .as_ptr();
     let appended = append_nonempty(collection);
     assert_eq!(appended.collections.len(), 1);
     assert_eq!(appended.collections[0].entities.len(), 2);
-    assert_eq!(appended.collections[0].entities[0].inset_idx, 0);
-    assert_eq!(appended.collections[0].entities[1].inset_idx, 1);
+    assert_eq!(appended.collections[0].entities[0].inset_idx(), 0);
+    assert_eq!(appended.collections[0].entities[1].inset_idx(), 1);
     assert_eq!(
-        appended.collections[0].entities[0].extrusion_loop.paths[0]
+        collection_loop(&appended.collections[0], 0).paths[0]
             .polyline
             .points
             .as_ptr(),
@@ -149,9 +154,19 @@ fn flow() -> Flow {
     }
 }
 
+fn collection_loop(collection: &ExtrusionEntityCollection, index: usize) -> &ExtrusionLoop {
+    match &collection.entities[index] {
+        ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop,
+        ExtrusionEntity::MultiPath(_) => panic!("classic append keeps loop entities"),
+    }
+}
+
 fn collection() -> ExtrusionEntityCollection {
     ExtrusionEntityCollection {
-        entities: vec![entity(0, 0), entity(10, 1)],
+        entities: vec![
+            ExtrusionEntity::Loop(entity(0, 0)),
+            ExtrusionEntity::Loop(entity(10, 1)),
+        ],
         source_order: 0,
     }
 }

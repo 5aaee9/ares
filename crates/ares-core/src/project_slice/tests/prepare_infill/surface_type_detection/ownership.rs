@@ -4,7 +4,8 @@ use crate::{
         perimeters::{
             self,
             classic::{
-                entity_collections::ExtrusionEntityCollection, gap_extrusion::GapFillEntity,
+                entity_collections::{ExtrusionEntity, ExtrusionEntityCollection},
+                gap_extrusion::GapFillEntity,
             },
         },
         prepare_infill::surface_type_detection,
@@ -109,10 +110,12 @@ fn task22o17_moves_unchanged_o16_allocations_and_rebuilds_fill_surfaces() {
 fn collection_allocations(collection: &ExtrusionEntityCollection) -> Vec<usize> {
     std::iter::once(collection.entities.as_ptr() as usize)
         .chain(collection.entities.iter().flat_map(|entity| {
-            std::iter::once(entity.extrusion_loop.paths.as_ptr() as usize).chain(
-                entity
-                    .extrusion_loop
-                    .paths
+            let paths = match entity {
+                ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+                ExtrusionEntity::MultiPath(_) => panic!("classic collections keep loop entities"),
+            };
+            std::iter::once(paths.as_ptr() as usize).chain(
+                paths
                     .iter()
                     .map(|path| path.polyline.points.as_ptr() as usize),
             )

@@ -1,4 +1,5 @@
 use super::{layers, perimeters};
+use perimeters::classic::entity_collections::ExtrusionEntity;
 
 #[cfg(test)]
 mod infill_boundary;
@@ -197,23 +198,23 @@ fn consume_appended_collections(
 ) {
     for collection in collections {
         for entity in collection.entities {
-            consume_ordered_loop(entity);
+            consume_entity(entity);
         }
     }
 }
 
-fn consume_ordered_loop(entity: perimeters::classic::entity_collections::OrderedExtrusionLoop) {
-    let _ = entity.inset_idx;
-    for path in entity.extrusion_loop.paths {
-        let _ = (
-            path.polyline,
-            path.role,
-            path.mm3_per_mm,
-            path.width,
-            path.height,
-        );
+fn consume_entity(entity: ExtrusionEntity) {
+    let paths = match entity {
+        ExtrusionEntity::Loop(ordered) => {
+            let _ = (ordered.inset_idx, ordered.extrusion_loop.role);
+            ordered.extrusion_loop.paths
+        }
+        ExtrusionEntity::MultiPath(multi_path) => multi_path.paths,
+    };
+    for path in paths {
+        let _ = path.polyline.fitting;
+        consume_gap_path(path);
     }
-    let _ = entity.extrusion_loop.role;
 }
 
 #[inline(never)]

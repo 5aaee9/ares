@@ -4,7 +4,9 @@ use crate::{
         fill_entities,
         perimeters::classic::{
             chained_loops::{ExtrusionLoop, ExtrusionLoopRole},
-            entity_collections::{ExtrusionEntityCollection, OrderedExtrusionLoop},
+            entity_collections::{
+                ExtrusionEntity, ExtrusionEntityCollection, OrderedExtrusionLoop,
+            },
             materialize::{ExtrusionPath, ExtrusionRole, Point3, Polyline3},
         },
         seam_candidates,
@@ -194,7 +196,10 @@ fn external_flow_width(collections: &[ExtrusionEntityCollection]) -> f32 {
     collections
         .iter()
         .flat_map(|collection| &collection.entities)
-        .flat_map(|entity| &entity.extrusion_loop.paths)
+        .flat_map(|entity| match entity {
+            ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+            ExtrusionEntity::MultiPath(multi_path) => &multi_path.paths,
+        })
         .find(|path| path.role == ExtrusionRole::ExternalPerimeter)
         .expect("KSR layers have an external perimeter")
         .width
@@ -219,13 +224,13 @@ fn generate(
 
 fn collection(paths: Vec<ExtrusionPath>) -> ExtrusionEntityCollection {
     ExtrusionEntityCollection {
-        entities: vec![OrderedExtrusionLoop {
+        entities: vec![ExtrusionEntity::Loop(OrderedExtrusionLoop {
             extrusion_loop: ExtrusionLoop {
                 paths,
                 role: ExtrusionLoopRole::Default,
             },
             inset_idx: 0,
-        }],
+        })],
         source_order: 0,
     }
 }

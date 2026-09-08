@@ -7,6 +7,7 @@ use super::{
     },
     orientation::{is_counter_clockwise, orient_loop, reverse_loop},
     traverse::traverse_loops,
+    types::ExtrusionEntity,
 };
 use crate::{
     ProcessWallDirection,
@@ -151,16 +152,14 @@ fn task22o9_preserves_source_compact_entity_against_original_loop_indexing() {
     ];
     let collection = traverse_loops(nodes, &seeds, ProcessWallDirection::CounterClockwise);
     assert_eq!(collection.entities.len(), 2);
-    assert_eq!(collection.entities[0].inset_idx, 7);
-    assert_eq!(
-        collection.entities[0].extrusion_loop.role,
-        ExtrusionLoopRole::Internal
-    );
-    assert_eq!(collection.entities[1].inset_idx, 8);
-    assert_eq!(
-        collection.entities[1].extrusion_loop.role,
-        ExtrusionLoopRole::Hole
-    );
+    let [ExtrusionEntity::Loop(first), ExtrusionEntity::Loop(second)] = &collection.entities[..]
+    else {
+        panic!("classic traversal emits only loop entities");
+    };
+    assert_eq!(first.inset_idx, 7);
+    assert_eq!(first.extrusion_loop.role, ExtrusionLoopRole::Internal);
+    assert_eq!(second.inset_idx, 8);
+    assert_eq!(second.extrusion_loop.role, ExtrusionLoopRole::Hole);
 }
 
 #[test]
@@ -185,7 +184,7 @@ fn task22o9_contours_emit_children_first_and_holes_emit_parent_first() {
         collection
             .entities
             .iter()
-            .map(|entity| entity.inset_idx)
+            .map(|entity| entity.inset_idx())
             .collect::<Vec<_>>(),
         vec![1, 2, 0]
     );

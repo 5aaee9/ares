@@ -7,7 +7,7 @@ use super::{
         traversal::TraversalSeed,
     },
     orientation::orient_loop,
-    types::{ExtrusionEntityCollection, OrderedExtrusionLoop},
+    types::{ExtrusionEntity, ExtrusionEntityCollection, OrderedExtrusionLoop},
 };
 
 struct PendingParent {
@@ -102,10 +102,10 @@ pub(super) fn traverse_loops(
                 frame.output.entities.reverse();
             }
             let is_contour = parent.is_contour;
-            let parent = OrderedExtrusionLoop {
+            let parent = ExtrusionEntity::Loop(OrderedExtrusionLoop {
                 extrusion_loop: parent.extrusion_loop,
                 inset_idx: i32::from(parent.depth),
-            };
+            });
             if is_contour {
                 frame.output.entities.append(&mut children.entities);
                 frame.output.entities.push(parent);

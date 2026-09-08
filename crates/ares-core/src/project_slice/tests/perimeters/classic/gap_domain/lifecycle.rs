@@ -5,6 +5,7 @@ use crate::{
         incomplete_sink,
         perimeters::{
             classic::{
+                entity_collections::ExtrusionEntity,
                 gap_domain,
                 perimeter_append::{
                     PreparedPerimeterAppendObject, PreparedPostClassicPerimeterAppend,
@@ -148,13 +149,13 @@ fn collect_entity_allocations(
         .entity_buffers
         .push(collection.entities.as_ptr() as usize);
     for entity in &collection.entities {
-        pointers
-            .path_buffers
-            .push(entity.extrusion_loop.paths.as_ptr() as usize);
+        let paths = match entity {
+            ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+            ExtrusionEntity::MultiPath(_) => panic!("classic collections keep loop entities"),
+        };
+        pointers.path_buffers.push(paths.as_ptr() as usize);
         pointers.point_buffers.extend(
-            entity
-                .extrusion_loop
-                .paths
+            paths
                 .iter()
                 .map(|path| path.polyline.points.as_ptr() as usize),
         );

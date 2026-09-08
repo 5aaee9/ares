@@ -14,6 +14,7 @@ mod path;
 #[cfg(test)]
 #[path = "motion/path/tests.rs"]
 mod path_tests;
+mod perimeter;
 mod scarf;
 mod state;
 #[cfg(test)]
@@ -42,8 +43,7 @@ use crate::{
     project_slice::{
         fill_entities::FillExtrusionEntity,
         perimeters::classic::{
-            chained_loops::ExtrusionLoopRole, gap_extrusion::GapFillEntity,
-            shortest_path::chain_and_reorder_entities,
+            gap_extrusion::GapFillEntity, shortest_path::chain_and_reorder_entities,
         },
     },
 };
@@ -201,7 +201,7 @@ where
             let perimeters = entities.split_off(split);
             emit_infills(output, &mut entities, geometry, state);
             for perimeter in perimeters {
-                emit_perimeter(output, perimeter, geometry, state);
+                perimeter::emit_perimeter(output, perimeter, geometry, state);
             }
         } else {
             let split = entities
@@ -209,7 +209,7 @@ where
                 .position(|entity| !matches!(entity, IslandPrintEntity::Perimeter(_)))
                 .unwrap_or(entities.len());
             for perimeter in entities.drain(..split) {
-                emit_perimeter(output, perimeter, geometry, state);
+                perimeter::emit_perimeter(output, perimeter, geometry, state);
             }
             if !interlude_emitted && !entities.is_empty() {
                 interlude_emitted = before_first_infill(output, state)?;
@@ -218,58 +218,6 @@ where
         }
     }
     Ok(interlude_emitted)
-}
-
-fn emit_perimeter(
-    output: &mut Vec<u8>,
-    entity: IslandPrintEntity,
-    geometry: LayerGeometry<'_>,
-    state: &mut EmitState,
-) {
-    let IslandPrintEntity::Perimeter(collection) = entity else {
-        unreachable!("perimeter phase contains only perimeter entities");
-    };
-    for mut loop_ in collection.entities {
-        if state.spiral_vase && loop_.extrusion_loop.role != ExtrusionLoopRole::Hole {
-            crate::project_slice::seam_placement::place_nearest_projection(
-                &mut loop_.extrusion_loop,
-                crate::project_slice::perimeters::classic::materialize::Point3 {
-                    x: local_cursor(state, geometry).x(),
-                    y: local_cursor(state, geometry).y(),
-                    z: 0,
-                },
-                geometry.scale,
-            );
-        } else if state.options.seam_position == crate::ProcessSeamPosition::Nearest {
-            let cursor = crate::project_slice::perimeters::classic::materialize::Point3 {
-                x: local_cursor(state, geometry).x(),
-                y: local_cursor(state, geometry).y(),
-                z: 0,
-            };
-            if let Some(layer) = geometry.nearest_seam_penalties {
-                crate::project_slice::seam_placement::place_nearest_penalized(
-                    &mut loop_.extrusion_loop,
-                    cursor,
-                    layer,
-                    geometry.staggered_inner,
-                    geometry.scale,
-                );
-            } else {
-                crate::project_slice::seam_placement::place_nearest(
-                    &mut loop_.extrusion_loop,
-                    cursor,
-                    geometry.scale,
-                );
-            }
-        }
-        loop_paths::emit(
-            output,
-            &loop_.extrusion_loop.paths,
-            loop_.extrusion_loop.role,
-            geometry,
-            state,
-        );
-    }
 }
 
 fn emit_infills(

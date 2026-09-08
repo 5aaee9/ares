@@ -3,8 +3,9 @@ use crate::{
     project_slice::{
         island_print_order::{IslandPrintEntity, OrderedExtrusionLayer},
         perimeters::classic::{
-            chained_loops::ExtrusionLoop, entity_collections::ExtrusionEntityCollection,
-            materialize::ExtrusionRole, traversal::PreparedPostClassicTraversal,
+            entity_collections::{ExtrusionEntity, ExtrusionEntityCollection},
+            materialize::{ExtrusionPath, ExtrusionRole},
+            traversal::PreparedPostClassicTraversal,
         },
         seam_candidates::{self, LayerSeamCandidates, SeamPerimeter},
     },
@@ -150,15 +151,16 @@ fn prepare_layer(
                         .entities
                         .iter()
                         .map(|entity| {
+                            let first_path = match entity {
+                                ExtrusionEntity::Loop(ordered) => {
+                                    ordered.extrusion_loop.paths.first()
+                                }
+                                ExtrusionEntity::MultiPath(multi_path) => multi_path.paths.first(),
+                            };
                             format!(
                                 "{:?}/{}",
-                                entity.extrusion_loop.paths.first().map(|path| path.role),
-                                entity
-                                    .extrusion_loop
-                                    .paths
-                                    .first()
-                                    .map(|path| path.width)
-                                    .unwrap_or_default()
+                                first_path.map(|path| path.role),
+                                first_path.map(|path| path.width).unwrap_or_default()
                             )
                         })
                         .collect::<Vec<_>>()
@@ -174,7 +176,10 @@ fn prepare_layer(
             let external_flow_width = collection
                 .entities
                 .iter()
-                .flat_map(|entity| &entity.extrusion_loop.paths)
+                .flat_map(|entity| match entity {
+                    ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+                    ExtrusionEntity::MultiPath(multi_path) => &multi_path.paths,
+                })
                 .find(|path| path.role == ExtrusionRole::ExternalPerimeter)
                 .map_or(0.0, |path| path.width);
             seam_candidates::RegionPerimeters {
@@ -236,22 +241,24 @@ impl PerimeterAssociation<'_> {
         collection
             .entities
             .iter()
-            .map(|entity| self.closest_loop(&entity.extrusion_loop))
+            .map(|entity| {
+                let paths = match entity {
+                    ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+                    ExtrusionEntity::MultiPath(multi_path) => &multi_path.paths,
+                };
+                self.closest_perimeter(paths)
+            })
             .collect()
     }
 
-    fn closest_loop(&self, loop_: &ExtrusionLoop) -> usize {
-        let point_count = loop_
-            .paths
-            .iter()
-            .map(|path| path.polyline.points.len())
-            .sum();
+    fn closest_perimeter(&self, paths: &[ExtrusionPath]) -> usize {
+        let point_count = paths.iter().map(|path| path.polyline.points.len()).sum();
         let mut path_index = 0;
         let mut point_index = 0;
         let mut candidate_index = 0;
         let mut closest_perimeter = None;
         for _ in 0..point_count {
-            let point = loop_.paths[path_index].polyline.points[point_index];
+            let point = paths[path_index].polyline.points[point_index];
             candidate_index = self.point_tree.closest(
                 self.positions,
                 super::Vec3::new(
@@ -266,8 +273,8 @@ impl PerimeterAssociation<'_> {
             }
             closest_perimeter = Some(perimeter_index);
             point_index += 1;
-            if point_index == loop_.paths[path_index].polyline.points.len() {
-                path_index = (path_index + 1) % loop_.paths.len();
+            if point_index == paths[path_index].polyline.points.len() {
+                path_index = (path_index + 1) % paths.len();
                 point_index = 0;
             }
         }

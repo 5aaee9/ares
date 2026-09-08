@@ -181,12 +181,15 @@ fn reorder_walls(
                 .peekable();
             while entities.peek().is_some() {
                 let mut island = vec![entities.next().unwrap()];
-                while entities.peek().is_some_and(|entity| entity.inset_idx != 0) {
+                while entities
+                    .peek()
+                    .is_some_and(|entity| entity.inset_idx() != 0)
+                {
                     island.push(entities.next().unwrap());
                 }
                 let split = island
                     .iter()
-                    .position(|entity| entity.inset_idx >= 2)
+                    .position(|entity| entity.inset_idx() >= 2)
                     .unwrap_or(island.len());
                 let deep = island.drain(split..).rev();
                 reordered.extend(deep);

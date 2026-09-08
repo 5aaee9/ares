@@ -1,5 +1,6 @@
 use crate::project_slice::perimeters::{
-    classic::medial_gap, prepare_post_classic_gap_domain, prepare_post_classic_medial_gap,
+    classic::{entity_collections::ExtrusionEntity, medial_gap},
+    prepare_post_classic_gap_domain, prepare_post_classic_medial_gap,
 };
 
 use super::super::super::super::support::ksr_project;
@@ -163,17 +164,8 @@ fn collection_allocations_gap(
         .flat_map(|surface| {
             std::iter::once(surface.appended.collections.as_ptr() as usize).chain(
                 surface.appended.collections.iter().flat_map(|collection| {
-                    std::iter::once(collection.entities.as_ptr() as usize).chain(
-                        collection.entities.iter().flat_map(|entity| {
-                            std::iter::once(entity.extrusion_loop.paths.as_ptr() as usize).chain(
-                                entity
-                                    .extrusion_loop
-                                    .paths
-                                    .iter()
-                                    .map(|path| path.polyline.points.as_ptr() as usize),
-                            )
-                        }),
-                    )
+                    std::iter::once(collection.entities.as_ptr() as usize)
+                        .chain(collection.entities.iter().flat_map(loop_path_allocations))
                 }),
             )
         })
@@ -190,19 +182,22 @@ fn collection_allocations_medial(
         .flat_map(|surface| {
             std::iter::once(surface.appended.collections.as_ptr() as usize).chain(
                 surface.appended.collections.iter().flat_map(|collection| {
-                    std::iter::once(collection.entities.as_ptr() as usize).chain(
-                        collection.entities.iter().flat_map(|entity| {
-                            std::iter::once(entity.extrusion_loop.paths.as_ptr() as usize).chain(
-                                entity
-                                    .extrusion_loop
-                                    .paths
-                                    .iter()
-                                    .map(|path| path.polyline.points.as_ptr() as usize),
-                            )
-                        }),
-                    )
+                    std::iter::once(collection.entities.as_ptr() as usize)
+                        .chain(collection.entities.iter().flat_map(loop_path_allocations))
                 }),
             )
         })
         .collect()
+}
+
+fn loop_path_allocations(entity: &ExtrusionEntity) -> impl Iterator<Item = usize> + '_ {
+    let paths = match entity {
+        ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+        ExtrusionEntity::MultiPath(_) => panic!("classic collections keep loop entities"),
+    };
+    std::iter::once(paths.as_ptr() as usize).chain(
+        paths
+            .iter()
+            .map(|path| path.polyline.points.as_ptr() as usize),
+    )
 }

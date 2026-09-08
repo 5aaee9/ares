@@ -1,7 +1,7 @@
 use crate::{
     geometry::{CoordinateScale, Point},
     project_slice::perimeters::classic::{
-        entity_collections::ExtrusionEntityCollection,
+        entity_collections::{ExtrusionEntity, ExtrusionEntityCollection},
         materialize::{ExtrusionPath, ExtrusionRole},
     },
 };
@@ -80,23 +80,44 @@ fn extract_collection(
     polygons: &mut Vec<SourcePerimeterPolygon>,
 ) {
     for entity in &collection.entities {
-        if entity
-            .extrusion_loop
-            .paths
-            .iter()
-            .any(|path| path.role == ExtrusionRole::ExternalPerimeter)
-        {
-            polygons.push(SourcePerimeterPolygon {
-                points: collect_loop_points(&entity.extrusion_loop.paths),
-                flow_width: external_flow_width,
-            });
+        // `SeamPlacer.cpp:413-420`: only loops scan every sub-path for the
+        // external-perimeter role; a multi-path contributes through its entity
+        // role, the first sub-path's role (`ExtrusionEntity.hpp`).
+        let external = match entity {
+            ExtrusionEntity::Loop(ordered) => ordered
+                .extrusion_loop
+                .paths
+                .iter()
+                .any(|path| path.role == ExtrusionRole::ExternalPerimeter),
+            ExtrusionEntity::MultiPath(multi_path) => matches!(
+                multi_path.paths.first().map(|path| path.role),
+                Some(ExtrusionRole::ExternalPerimeter)
+            ),
+        };
+        if !external {
+            continue;
         }
+        let paths = match entity {
+            ExtrusionEntity::Loop(ordered) => &ordered.extrusion_loop.paths,
+            // `ExtrusionEntity::collect_points` (`ExtrusionEntity.hpp`) appends
+            // every multi-path sub-path point.
+            ExtrusionEntity::MultiPath(multi_path) => &multi_path.paths,
+        };
+        polygons.push(SourcePerimeterPolygon {
+            points: collect_loop_points(paths),
+            flow_width: external_flow_width,
+        });
     }
     if polygons.is_empty() {
         let points = collection
             .entities
             .iter()
-            .flat_map(|entity| collect_loop_points(&entity.extrusion_loop.paths))
+            .flat_map(|entity| match entity {
+                ExtrusionEntity::Loop(ordered) => {
+                    collect_loop_points(&ordered.extrusion_loop.paths)
+                }
+                ExtrusionEntity::MultiPath(multi_path) => collect_loop_points(&multi_path.paths),
+            })
             .collect::<Vec<_>>();
         if !points.is_empty() {
             polygons.push(SourcePerimeterPolygon {

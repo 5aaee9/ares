@@ -3,7 +3,7 @@ use crate::{
     project_slice::perimeters::{
         classic::{
             chained_loops::ExtrusionLoopRole,
-            entity_collections::OrderedExtrusionLoop,
+            entity_collections::ExtrusionEntity,
             materialize::{ExtrusionPath, ExtrusionRole},
             perimeter_append::{
                 InactiveOuterBrimReordering, InactiveOverhangReorientation, InactiveWallReordering,
@@ -120,20 +120,24 @@ fn accumulate_outer_brim(reason: InactiveOuterBrimReordering, checksum: &mut i12
     }
 }
 
-fn accumulate_entities(entities: &[OrderedExtrusionLoop], checksum: &mut i128) {
+fn accumulate_entities(entities: &[ExtrusionEntity], checksum: &mut i128) {
     mix(checksum, entities.len() as i128);
     for entity in entities {
-        mix(checksum, i128::from(entity.inset_idx));
+        let ordered = match entity {
+            ExtrusionEntity::Loop(ordered) => ordered,
+            ExtrusionEntity::MultiPath(_) => panic!("classic traversal emits loop entities"),
+        };
+        mix(checksum, i128::from(ordered.inset_idx));
         mix(
             checksum,
-            match entity.extrusion_loop.role {
+            match ordered.extrusion_loop.role {
                 ExtrusionLoopRole::Internal => 1,
                 ExtrusionLoopRole::Default => 2,
                 ExtrusionLoopRole::Hole => 3,
             },
         );
-        mix(checksum, entity.extrusion_loop.paths.len() as i128);
-        for path in &entity.extrusion_loop.paths {
+        mix(checksum, ordered.extrusion_loop.paths.len() as i128);
+        for path in &ordered.extrusion_loop.paths {
             accumulate_path(path, checksum);
         }
     }

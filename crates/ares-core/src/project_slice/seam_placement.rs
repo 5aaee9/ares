@@ -17,7 +17,7 @@ use crate::{
         },
         perimeters::classic::{
             chained_loops::ExtrusionLoop,
-            entity_collections::ExtrusionEntityCollection,
+            entity_collections::{ExtrusionEntity, ExtrusionEntityCollection},
             materialize::{ExtrusionPath, ExtrusionRole, Point3},
             traversal::PreparedPostClassicTraversal,
         },
@@ -218,6 +218,12 @@ fn place_collection(
     scale: CoordinateScale,
 ) {
     for (entity, &perimeter_index) in collection.entities.iter_mut().zip(perimeter_indices) {
+        let ExtrusionEntity::Loop(ordered) = entity else {
+            // Aligned-seam placement targets loops (`SeamPlacer.cpp:1500`);
+            // arachne wall generation stays typed-rejected before
+            // materialization, so no multi-path can reach placement.
+            unreachable!("multi-path seam placement lands with the arachne materialization seam");
+        };
         let perimeter = &plan.candidates.perimeters[perimeter_index];
         let choice = &plan.choices[perimeter_index];
         let selected = choice.seam_index;
@@ -233,7 +239,7 @@ fn place_collection(
         };
         let selected_candidate = &plan.candidates.points[selected];
         place_loop(
-            &mut entity.extrusion_loop,
+            &mut ordered.extrusion_loop,
             Placement {
                 selected: selected_candidate,
                 previous: &plan.candidates.points[previous],
