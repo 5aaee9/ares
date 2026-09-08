@@ -183,16 +183,6 @@ where
     F: FnMut(&mut Vec<u8>, &mut EmitState) -> Result<bool, SliceError>,
 {
     let mut interlude_emitted = false;
-    if let Ok(path) = std::env::var("ARES_DUMP_IORDER") {
-        use std::io::Write;
-        if let Ok(mut file) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-        {
-            let _ = writeln!(file, "LAYER z={}", state.layer_z);
-        }
-    }
     for island in &mut layer.islands {
         let mut entities = std::mem::take(&mut island.entities);
         let infill_first = matches!(
@@ -300,48 +290,7 @@ fn emit_infills(
             index += 1;
         }
     }
-    dump_infill_reorder(entities, state, geometry);
     chain_and_reorder_entities(entities, local_cursor(state, geometry));
-    if let Ok(path) = std::env::var("ARES_DUMP_IORDER") {
-        use std::io::Write;
-        if let Ok(mut file) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-        {
-            let _ = write!(file, "AFTER");
-            for entity in entities.iter() {
-                let (first, reversible) = match entity {
-                    IslandPrintEntity::Fill(entity) => {
-                        use crate::project_slice::perimeters::classic::shortest_path::ChainEntity;
-                        (entity.first_point(), true)
-                    }
-                    IslandPrintEntity::FillCollection(collection) => {
-                        (collection.first_point(), !collection.no_sort)
-                    }
-                    IslandPrintEntity::Thin(_) | IslandPrintEntity::Perimeter(_) => continue,
-                };
-                let last = match entity {
-                    IslandPrintEntity::Fill(entity) => {
-                        use crate::project_slice::perimeters::classic::shortest_path::ChainEntity;
-                        entity.last_point()
-                    }
-                    IslandPrintEntity::FillCollection(collection) => collection.last_point(),
-                    IslandPrintEntity::Thin(_) | IslandPrintEntity::Perimeter(_) => continue,
-                };
-                let _ = reversible;
-                let _ = write!(
-                    file,
-                    " ({:.3},{:.3}|L{:.3},{:.3})",
-                    geometry.scale.unscale(first.x()),
-                    geometry.scale.unscale(first.y()),
-                    geometry.scale.unscale(last.x()),
-                    geometry.scale.unscale(last.y())
-                );
-            }
-            let _ = writeln!(file);
-        }
-    }
     entities.append(&mut ironing);
     for entity in entities.drain(..) {
         match entity {
@@ -431,6 +380,11 @@ fn emit_variable_width_entity(
 }
 
 fn local_cursor(state: &EmitState, geometry: LayerGeometry<'_>) -> Point {
+    // `GCode::extrude_infill` chains from m_last_pos, not GCodeWriter::m_pos.
+    if let Some((x, y)) = state.last_scaled_position {
+        return Point::new(x, y);
+    }
+    // Before the first generated path, use the position left by start G-code.
     Point::new(
         geometry
             .scale
@@ -441,50 +395,4 @@ fn local_cursor(state: &EmitState, geometry: LayerGeometry<'_>) -> Point {
             .checked_scale(state.y - state.offset.1)
             .expect("emitted Y remains in the coordinate domain"),
     )
-}
-
-fn dump_infill_reorder(
-    entities: &[IslandPrintEntity],
-    state: &EmitState,
-    geometry: LayerGeometry<'_>,
-) {
-    let Ok(path) = std::env::var("ARES_DUMP_IORDER") else {
-        return;
-    };
-    use std::io::Write;
-    let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-    else {
-        return;
-    };
-    let cursor = local_cursor(state, geometry);
-    let _ = write!(
-        file,
-        "REORDER cursor={:.3},{:.3} n={}",
-        geometry.scale.unscale(cursor.x()),
-        geometry.scale.unscale(cursor.y()),
-        entities.len()
-    );
-    for entity in entities {
-        let (first, reversible) = match entity {
-            IslandPrintEntity::Fill(entity) => {
-                use crate::project_slice::perimeters::classic::shortest_path::ChainEntity;
-                (entity.first_point(), true)
-            }
-            IslandPrintEntity::FillCollection(collection) => {
-                (collection.first_point(), !collection.no_sort)
-            }
-            IslandPrintEntity::Thin(_) | IslandPrintEntity::Perimeter(_) => continue,
-        };
-        let _ = write!(
-            file,
-            " | open{}({:.3},{:.3})",
-            if reversible { "" } else { "NR" },
-            geometry.scale.unscale(first.x()),
-            geometry.scale.unscale(first.y())
-        );
-    }
-    let _ = writeln!(file);
 }

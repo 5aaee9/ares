@@ -28,6 +28,9 @@ pub(in crate::project_slice::gcode_emit) struct EmitState {
     /// The Z the machine start/filament g-code left the nozzle at; mirrors
     /// `GCodeWriter::m_pos(2)` for the `change_layer` `will_move_z` gate.
     pub(in crate::project_slice::gcode_emit) writer_z: Option<f64>,
+    /// Generator `GCode::m_last_pos` in local scaled coordinates. Writer-only
+    /// inward moves change x/y without changing this cursor; None precedes
+    /// the first generated path (start G-code supplies the initial writer XY).
     pub(in crate::project_slice::gcode_emit) last_scaled_position: Option<(i64, i64)>,
     pub(in crate::project_slice::gcode_emit) last_feature: Option<&'static str>,
     pub(in crate::project_slice::gcode_emit) last_width: Option<f32>,

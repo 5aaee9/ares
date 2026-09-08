@@ -1,3 +1,5 @@
+mod role_end;
+
 use super::{ProcessedPoint, update_for_constant_path, update_for_variable_segment};
 use crate::project_slice::gcode_emit::motion::{
     EmitState, MotionOptions, features::PathProperties,

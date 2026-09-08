@@ -1,4 +1,7 @@
-use super::{Boundary, Request, rectangle_route};
+mod boundary_parity;
+mod empty_boundary;
+
+use super::{Request, rectangle_route};
 use crate::{
     geometry::{CoordinateScale, ExPolygon, Point, Polygon},
     project_slice::{
@@ -140,7 +143,14 @@ fn boundary_builds_from_layer_slices() {
             top_surfaces: &[],
         },
     };
-    let boundary = super::build_boundary(&geometry).expect("a square builds a boundary");
+    let super::boundary::BuildResult::Ready(boundary) = super::boundary::Boundary::build(
+        &geometry.avoid_crossing,
+        geometry.scale,
+        [Point::new(0, 0); 2],
+    )
+    .unwrap() else {
+        panic!("a square builds a boundary");
+    };
     assert!(!boundary.contours.is_empty());
     let length: f64 = boundary
         .contours

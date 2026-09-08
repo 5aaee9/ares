@@ -77,7 +77,7 @@ fn update_marker(output: &mut Vec<u8>, state: &mut EmitState, marker: FanMarker,
     let stopping = !active && was_active;
     set_marker_state(state, marker, active);
     if (stopping || fresh_start)
-        && let Some(target) = deferred_target(state)
+        && let Some(target) = deferred_target(state, stopping)
     {
         super::super::cooling::append_deferred_role_fan(output, target);
     }
@@ -107,7 +107,10 @@ fn set_marker_state(state: &mut EmitState, marker: FanMarker, active: bool) {
     }
 }
 
-fn deferred_target(state: &EmitState) -> Option<super::super::cooling::DeferredRoleFan> {
+fn deferred_target(
+    state: &EmitState,
+    stopping: bool,
+) -> Option<super::super::cooling::DeferredRoleFan> {
     use super::super::cooling::DeferredRoleFan;
 
     if !state.options.enable_overhang_bridge_fan {
@@ -121,7 +124,12 @@ fn deferred_target(state: &EmitState) -> Option<super::super::cooling::DeferredR
     }
     let overhang_speed = overhang_speed(state);
     if state.overhang_fan_active {
-        return Some(DeferredRoleFan::Conditional(overhang_speed));
+        // `CoolingBuffer.cpp:856–869` forces emission on role END even
+        // when the remaining role's START does not exceed the layer baseline.
+        return Some(DeferredRoleFan::Conditional {
+            speed: overhang_speed,
+            force: stopping,
+        });
     }
     if state.internal_bridge_fan_active {
         return Some(
@@ -130,7 +138,10 @@ fn deferred_target(state: &EmitState) -> Option<super::super::cooling::DeferredR
                 .internal_bridge_fan_speed
                 .role_speed(None)
                 .map_or(
-                    DeferredRoleFan::Conditional(overhang_speed),
+                    DeferredRoleFan::Conditional {
+                        speed: overhang_speed,
+                        force: stopping,
+                    },
                     DeferredRoleFan::Fixed,
                 ),
         );

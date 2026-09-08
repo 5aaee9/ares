@@ -75,21 +75,6 @@ pub(super) fn emit(
         }
     }
     state.wipe_path = emitted_loop_path;
-    if let Ok(path) = std::env::var("ARES_DUMP_PATH") {
-        use std::io::Write;
-        if let Ok(mut file) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-        {
-            let _ = write!(file, "LP");
-            for point in &state.wipe_path {
-                let scaled = super::travel::scaled_position(*point, state);
-                let _ = write!(file, " ({},{})", scaled.0, scaled.1);
-            }
-            let _ = writeln!(file);
-        }
-    }
     append_inward_move(output, paths, loop_role, geometry, state);
 }
 
@@ -289,7 +274,8 @@ fn append_inward_move(
     output.extend_from_slice(format!("G1 X{} Y{}\n", format_axis(x), format_axis(y)).as_bytes());
     state.x = x;
     state.y = y;
-    state.last_scaled_position = Some((point.x(), point.y()));
+    // `GCode::extrude_loop` (GCode.cpp:6032) moves only the writer here;
+    // m_last_pos remains the clipped extrusion endpoint for subsequent chaining.
 }
 
 fn inward_point(

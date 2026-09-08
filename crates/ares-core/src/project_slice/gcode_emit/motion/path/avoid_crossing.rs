@@ -4,13 +4,19 @@
 
 mod boundary;
 mod router;
+mod safe_zone;
 
 #[cfg(test)]
 mod tests;
 
 use crate::project_slice::gcode_emit::motion::arc;
 
-pub(in crate::project_slice::gcode_emit) use boundary::Boundary;
+/// `init_layer`'s safe zone and lazily initialized `m_internal` boundary.
+#[derive(Clone)]
+pub(in crate::project_slice::gcode_emit) struct Boundary {
+    safe_zone: Vec<crate::geometry::ExPolygon>,
+    internal: Option<boundary::Boundary>,
+}
 pub(super) mod rectangle;
 pub(in crate::project_slice::gcode_emit) use rectangle::route as rectangle_route;
 
@@ -25,25 +31,26 @@ pub(super) struct Request<'a> {
     pub(super) after_skirt: bool,
 }
 
-/// Build the routing boundary for a layer. Returns `None` when the layer has
-/// no usable boundary (`travel_to` falls back to a straight line).
+/// Initialize the layer safe zone; routing geometry is built only after a
+/// travel fails containment (`AvoidCrossingPerimeters.cpp:1250-1258`).
 pub(in crate::project_slice::gcode_emit) fn build_boundary(
     geometry: &LayerGeometry<'_>,
 ) -> Option<Boundary> {
-    Boundary::build(&geometry.avoid_crossing, geometry.scale)
-        .ok()
-        .flatten()
+    Some(Boundary {
+        safe_zone: safe_zone::build(&geometry.avoid_crossing, geometry.scale).ok()?,
+        internal: None,
+    })
 }
 
 /// Route `start`→`end` along the boundary contours, mirroring
-/// `AvoidCrossingPerimeters::travel_to`. The boundary is built once per
-/// layer and cached in the emit state. Returns `Some(path)` for a routed
-/// detour in G-code millimetres (without the endpoints) — or `None` while a
-/// piece is still routed by the temporary rectangle shell (`rectangle.rs`):
-/// detour waypoints require the multi-point ramp emission branch of
-/// `GCodeWriter::travel_to_xyz` (`GCode.cpp:7486-7505`), which lifts Z over
-/// the first detour leg and eases it over the last.
-pub(super) fn route(request: Request<'_>, boundary: Option<&Boundary>) -> Option<Vec<arc::Point>> {
+/// `AvoidCrossingPerimeters::travel_to`. Rebuild the cached internal boundary
+/// when either endpoint leaves its original (pre-EdgeGrid expansion) bounds.
+/// Return interior waypoints in G-code millimetres; the caller owns endpoints.
+/// `None` still reaches the existing temporary rectangle shell.
+pub(super) fn route(
+    request: Request<'_>,
+    boundary: Option<&mut Boundary>,
+) -> Option<Vec<arc::Point>> {
     // Detour waypoints require the multi-point ramp emission branch of
     // `GCodeWriter::travel_to_xyz` (`GCode.cpp:7486-7505`); until it lands,
     // all routing goes through the rectangle shell.
@@ -59,7 +66,6 @@ pub(super) fn route(request: Request<'_>, boundary: Option<&Boundary>) -> Option
         after_skirt: _,
     } = request;
     let boundary = boundary?;
-    let spacing = geometry.avoid_crossing.perimeter_spacing;
     let scale = geometry.scale;
     let to_scaled = |point: arc::Point| -> Option<crate::geometry::Point> {
         Some(crate::geometry::Point::new(
@@ -72,30 +78,49 @@ pub(super) fn route(request: Request<'_>, boundary: Option<&Boundary>) -> Option
     // Travels fully inside the lslices safe zone never route
     // (`any_expolygon_contains(m_lslices_offset, ...)`,
     // `AvoidCrossingPerimeters.cpp:1255`).
-    if boundary.safe_zone_contains(scaled_start, scaled_end) {
+    if boundary.safe_zone.is_empty()
+        || boundary
+            .safe_zone
+            .iter()
+            .any(|polygon| safe_zone::contains(scaled_start, scaled_end, polygon))
+    {
         return Some(Vec::new());
     }
-    let search_radius = 2.0 * f64::from(spacing);
-    let search_radius = scale.checked_scale(search_radius).unwrap_or_default() as f64;
+    if boundary
+        .internal
+        .as_ref()
+        .is_none_or(|internal| !internal.contains(scaled_start) || !internal.contains(scaled_end))
+    {
+        boundary.internal = match boundary::Boundary::build(
+            &geometry.avoid_crossing,
+            scale,
+            [scaled_start, scaled_end],
+        )
+        .ok()?
+        {
+            boundary::BuildResult::Unavailable => None,
+            // `travel_to` (:1259–1264, :1285–1288) skips an empty internal
+            // boundary and returns {start, end}, not a rectangle detour.
+            boundary::BuildResult::Empty => {
+                boundary.internal = None;
+                return Some(Vec::new());
+            }
+            boundary::BuildResult::Ready(internal) => Some(internal),
+        };
+    }
+    let boundary = boundary.internal.as_ref()?;
     let (path, _intersections) =
-        router::avoid_perimeters(boundary, scaled_start, scaled_end, search_radius).ok()?;
+        router::avoid_perimeters(boundary, scaled_start, scaled_end).ok()?;
     let mut output = Vec::with_capacity(path.len());
-    for point in path {
+    // Upstream restores the original endpoints after routing (which may nudge
+    // them), then emits each interior point, even if formatting rounds two
+    // distinct points to the same command. The caller appends the destination.
+    let interior_count = path.len() - 2;
+    for point in path.into_iter().skip(1).take(interior_count) {
         output.push(arc::Point {
             x: scale.unscale(point.x()) + offset.0,
             y: scale.unscale(point.y()) + offset.1,
         });
-    }
-    output.dedup_by(|next, last| {
-        (next.x - last.x).abs() < 1.0e-4 && (next.y - last.y).abs() < 1.0e-4
-    });
-    // Upstream `travel.points` keeps the start at index 0 and emits from
-    // index 1 (`GCode.cpp:7481-7505`); drop it so the first entry is the
-    // first waypoint.
-    if output.first().is_some_and(|point| {
-        (point.x - start.x).abs() < 1.0e-4 && (point.y - start.y).abs() < 1.0e-4
-    }) {
-        output.remove(0);
     }
     Some(output)
 }

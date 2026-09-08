@@ -1,3 +1,5 @@
+mod role_end;
+
 #[tokio::test]
 async fn task22o174_layer_cooling_matches_orca_slowdown_feedrate() {
     let output = crate::slice_project(

@@ -5,7 +5,7 @@
 
 use crate::geometry::{
     ClipperError, Coord, CoordinateScale, EdgeGrid, ExPolygon, JoinType, Point, Polygon,
-    difference_ex, offset_expolygons, offset_paths, union_safety_offset_expolygons,
+    difference_ex, offset_expolygons, offset_paths, union_expolygons,
 };
 use crate::project_slice::elephant_foot::distance::{
     DistanceThresholds, ResampledPoint, filtered_contour_distances,
@@ -17,14 +17,20 @@ const MITER_LIMIT: f64 = 2.0;
 
 /// The routing boundary: the inner-offset slice union as contours, an edge
 /// grid over them, and per-contour cumulative distances.
-pub(in crate::project_slice::gcode_emit) struct Boundary {
+#[derive(Clone)]
+pub(super) struct Boundary {
+    pub(super) scaled_spacing: f32,
     pub(super) contours: Vec<Vec<Point>>,
     pub(super) grid: EdgeGrid,
     pub(super) contour_lengths: Vec<Vec<f64>>,
-    /// The safe zone: lslices inset by external_perimeter_width × coeff
-    /// (`init_layer`, `AvoidCrossingPerimeters.cpp:1324-1327`) — travels
-    /// fully inside never route.
-    pub(super) safe_zone: Vec<crate::geometry::ExPolygon>,
+    bounds: (Point, Point),
+}
+
+#[expect(clippy::large_enum_variant, reason = "avoid a transient allocation")]
+pub(super) enum BuildResult {
+    Unavailable,
+    Empty,
+    Ready(Boundary),
 }
 
 impl Boundary {
@@ -36,13 +42,9 @@ impl Boundary {
         &self.contour_lengths[index]
     }
 
-    /// A travel segment fully inside any safe-zone expolygon never routes
-    /// (`travel_to`'s `any_expolygon_contains(m_lslices_offset, ...)` gate,
-    /// `AvoidCrossingPerimeters.cpp:1255`).
-    pub(super) fn safe_zone_contains(&self, start: Point, end: Point) -> bool {
-        self.safe_zone
-            .iter()
-            .any(|expolygon| segment_inside_expolygon(start, end, expolygon))
+    pub(super) fn contains(&self, point: Point) -> bool {
+        let (min, max) = self.bounds;
+        point.x() >= min.x() && point.y() >= min.y() && point.x() <= max.x() && point.y() <= max.y()
     }
 
     /// `get_boundary` + `init_boundary`: `union_ex(inner_offset(lslices,
@@ -51,40 +53,24 @@ impl Boundary {
     pub(in crate::project_slice::gcode_emit) fn build(
         geometry: &AvoidCrossingGeometry<'_>,
         scale: CoordinateScale,
-    ) -> Result<Option<Boundary>, ClipperError> {
+        endpoints: [Point; 2],
+    ) -> Result<BuildResult, ClipperError> {
         if geometry.layer_slices.is_empty() || geometry.perimeter_spacing <= 0.0 {
-            return Ok(None);
+            return Ok(BuildResult::Unavailable);
         }
         let unit = |millimetres: f64| scale.checked_scale(millimetres);
-        let offset_dis = 1.5 * f64::from(geometry.perimeter_spacing);
-        let Some(offset_dis) = unit(offset_dis) else {
-            return Ok(None);
+        // `Flow::scaled_spacing` truncates before `get_perimeter_spacing`
+        // converts to float; retain scaled units for all boundary radii.
+        let Some(scaled_spacing) = unit(f64::from(geometry.perimeter_spacing)) else {
+            return Ok(BuildResult::Unavailable);
         };
-        let offset_dis = offset_dis as f64;
+        let scaled_spacing = scaled_spacing as f32;
+        let offset_dis = 1.5 * f64::from(scaled_spacing);
         let mut boundary = inner_offset(geometry.layer_slices, offset_dis, scale)?;
-        if let Ok(path) = std::env::var("ARES_DUMP_BOUNDARY") {
-            use std::io::Write;
-            if let Ok(mut file) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(path)
-            {
-                for expolygon in &boundary {
-                    let _ = write!(file, "EP");
-                    for point in expolygon.contour().points() {
-                        let _ = write!(file, " ({},{})", point.x(), point.y());
-                    }
-                    let _ = writeln!(file);
-                }
-            }
-        }
         if !geometry.top_surfaces.is_empty() {
             // perimeter_offset = spacing / 2; the diff insets the top
             // surfaces by 1.2 * perimeter_offset.
-            let inset_by = 0.6 * f64::from(geometry.perimeter_spacing);
-            let Some(inset_by) = unit(inset_by) else {
-                return Ok(None);
-            };
+            let inset_by = 0.6 * f64::from(scaled_spacing);
             let inset = offset_expolygons(
                 &geometry
                     .top_surfaces
@@ -98,7 +84,7 @@ impl Boundary {
             boundary = difference_ex(&boundary, &inset)?;
         }
         if boundary.is_empty() {
-            return Ok(None);
+            return Ok(BuildResult::Empty);
         }
         let contours = boundary
             .iter()
@@ -108,7 +94,11 @@ impl Boundary {
                     .map(|polygon| polygon.points().to_vec())
             })
             .collect::<Vec<_>>();
-        let (min, max) = contours_bounds(&contours);
+        let (mut min, mut max) = contours_bounds(&contours);
+        for point in endpoints {
+            min = Point::new(min.x().min(point.x()), min.y().min(point.y()));
+            max = Point::new(max.x().max(point.x()), max.y().max(point.y()));
+        }
         // `init_boundary(boundary, polygons, merge_points)` pads the bounds by
         // the bbox radius so travel endpoints outside the contours stay in
         // the grid (`AvoidCrossingPerimeters.cpp:1216-1229`).
@@ -133,70 +123,14 @@ impl Boundary {
             .iter()
             .map(|contour| cumulative_distances(contour))
             .collect();
-        let safe_zone = safe_zone(geometry, scale)?;
-        Ok(Some(Boundary {
+        Ok(BuildResult::Ready(Boundary {
+            scaled_spacing,
             contours,
             grid,
             contour_lengths,
-            safe_zone,
+            bounds: (padded_min, padded_max),
         }))
     }
-}
-
-/// `init_layer` safe zone (`AvoidCrossingPerimeters.cpp:1324-1327`): the
-/// layer slices inset by external_perimeter_width × coeff, trying
-/// 0.6/0.5/0.45 until non-empty.
-fn safe_zone(
-    geometry: &AvoidCrossingGeometry<'_>,
-    scale: CoordinateScale,
-) -> Result<Vec<crate::geometry::ExPolygon>, ClipperError> {
-    for coeff in [0.6_f32, 0.5, 0.45] {
-        let Some(inset) = scale.checked_scale(f64::from(geometry.external_perimeter_width * coeff))
-        else {
-            continue;
-        };
-        let offset = offset_expolygons(
-            &geometry
-                .layer_slices
-                .iter()
-                .map(|expolygon| (*expolygon).clone())
-                .collect::<Vec<_>>(),
-            -(inset as f32),
-            JoinType::Miter,
-            MITER_LIMIT,
-        )?;
-        if !offset.is_empty() {
-            return Ok(offset);
-        }
-    }
-    Ok(Vec::new())
-}
-
-/// Both endpoints inside the contour (outside every hole) and no contour
-/// edge crossing the segment.
-fn segment_inside_expolygon(start: Point, end: Point, expolygon: &ExPolygon) -> bool {
-    // Upstream `any_expolygon_contains` (AvoidCrossingPerimeters.cpp:
-    // 716-736): with no grid-cell edge intersection along the line, the
-    // test is `bbox.contains(a) && bbox.contains(b) &&
-    // ex_polygon.contains(travel.a)` — ONLY the START point must lie
-    // inside the polygon (both inside the bbox). A travel starting
-    // inside and ending outside without crossing edges is SAFE.
-    let contour = expolygon.contour();
-    if !contour.contains(&start) {
-        return false;
-    }
-    for hole in expolygon.holes() {
-        if hole.contains(&start) {
-            return false;
-        }
-    }
-    let travel = crate::geometry::Line::new(start, end);
-    let crossing = contour
-        .lines()
-        .into_iter()
-        .chain(expolygon.holes().iter().flat_map(|hole| hole.lines()))
-        .any(|edge| travel.intersection(edge).is_some());
-    !crossing
 }
 
 fn cumulative_distances(contour: &[Point]) -> Vec<f64> {
@@ -397,7 +331,7 @@ fn inner_offset(
         }
         result.push(ex_poly);
     }
-    union_safety_offset_expolygons(&result)
+    union_expolygons(&result, &[])
 }
 
 fn resample_expolygon(
