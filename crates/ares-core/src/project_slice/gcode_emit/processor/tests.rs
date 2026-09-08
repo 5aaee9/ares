@@ -132,9 +132,9 @@ fn g4_dwell_p_word_counts_milliseconds_and_s_takes_precedence() {
     // process_G4's has_value('S') || has_value('P') short-circuits, so a
     // parseable S suppresses the P lookup entirely. The 2e-6 tolerance covers
     // the f32 block-time attribution of the appended dwell seconds.
-    assert!((p.total - 20.543348).abs() < 2e-6, "{}", p.total);
+    assert!((p.total - 20.543351).abs() < 2e-6, "{}", p.total);
     assert!(
-        (s_and_p.total - 30.043348).abs() < 2e-6,
+        (s_and_p.total - 30.043351).abs() < 2e-6,
         "{}",
         s_and_p.total
     );
@@ -179,7 +179,7 @@ fn collinear_cruise_time_is_not_zeroed_by_default_jerk() {
 
     let times = planned_times(&[first, second]);
 
-    assert!((times.iter().sum::<f64>() - 20.043348).abs() < 1e-6);
+    assert!((times.iter().sum::<f64>() - 20.043351).abs() < 1e-6);
 }
 
 #[test]
@@ -318,7 +318,7 @@ fn single_block_synchronization_waits_for_next_motion() {
     let estimate = Estimate::from_lines(&lines, 0.0, nonbinding_axis_limits());
 
     assert!(
-        (estimate.total - 20.043348).abs() < 1e-6,
+        (estimate.total - 20.043351).abs() < 1e-6,
         "{}",
         estimate.total
     );

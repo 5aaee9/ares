@@ -127,11 +127,12 @@ impl Estimate {
                     let count = motion_blocks.len();
                     arc_segment_counts[index] = arc_internal.unwrap_or(0);
                     blocks.extend(motion_blocks);
-                    // The arc line plus its internal discretized G1s consume
-                    // `1 + internal` g1 line ids; all planner segments carry
-                    // the arc line's own id.
+                    // Every discretized internal G1 consumes its own g1 line
+                    // id (`GCodeProcessor.cpp:3868` `++m_g1_line_id` per
+                    // `process_G1`), so segment i carries id `base + i`;
+                    // only the exported file keeps the single arc line.
                     g1_line_id += 1;
-                    block_line_ids.extend(std::iter::repeat_n(g1_line_id, count));
+                    block_line_ids.extend((0..count).map(|offset| g1_line_id + offset));
                     prepare_stages.extend(std::iter::repeat_n(prepare_stage, count));
                     g1_line_id += arc_internal.unwrap_or(0);
                 }
@@ -171,8 +172,14 @@ impl Estimate {
                     Some(id)
                 }
                 "G2" | "G3" => {
-                    let id = exported_g1_lines;
-                    exported_g1_lines += 1 + arc_segment_counts[index];
+                    // `process_line_move(g1_lines_counter +
+                    // internal_g1_lines_counter)` (`GCodeProcessor.cpp:1466`):
+                    // the arc line's marker reads the second-to-last internal
+                    // segment's cache entry, and the trailing segment's time
+                    // lands on the next motion line's lookup.
+                    let internal = arc_segment_counts[index];
+                    let id = exported_g1_lines + internal;
+                    exported_g1_lines += 1 + internal;
                     Some(id)
                 }
                 "G28" => {

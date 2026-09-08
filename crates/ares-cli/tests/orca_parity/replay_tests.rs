@@ -101,19 +101,30 @@ fn explicit_divergent_orca_output_fails() {
 }
 
 #[test]
-fn unchanged_classic_is_strictly_rejected_with_complete_paired_bytes_and_hashes() {
+fn unchanged_classic_replays_byte_identical_with_complete_paired_bytes_and_hashes() {
+    // DIVERGENT until the block_time distance-based trapezoid port removed
+    // the negative-decel time deficit that lagged the M73 stream one move
+    // (first difference was line 121: `M73 P10 R8` expected after
+    // `G1 X114.27 Y114.23 E.26118`, actual one line later); the replay now
+    // matches the stored Orca artifact byte-for-byte under the
+    // generator/timestamp-only normalization.
     let temp = tempfile::tempdir().unwrap();
     let input = temp.path().join("input");
     fixture(&input, true);
     let artifacts = temp.path().join("artifacts");
     let output = replay(&input, &artifacts, temp.path());
-    assert_failed(output);
+    assert!(
+        output.status.success(),
+        "explicit replay falsely failed:\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
     let summary: Value =
         serde_json::from_slice(&fs::read(artifacts.join("replay-summary.json")).unwrap()).unwrap();
     assert_eq!(summary["evidence"], "ordered_bytes_generator_only");
     assert_eq!(summary["compared"], 1);
-    assert_eq!(summary["passed"], 0);
-    assert_eq!(summary["failed"], 1);
+    assert_eq!(summary["passed"], 1);
+    assert_eq!(summary["failed"], 0);
     let case = Path::new(summary["cases"][0]["artifacts"].as_str().unwrap());
     let manifest: Value =
         serde_json::from_slice(&fs::read(case.join("manifest.json")).unwrap()).unwrap();
@@ -154,17 +165,14 @@ fn unchanged_classic_is_strictly_rejected_with_complete_paired_bytes_and_hashes(
         manifest["comparator"],
         "golden::compare_ordered_bytes_generator_only"
     );
-    assert_eq!(manifest["status"], "DIVERGENT");
-    let error = fs::read_to_string(case.join("error.txt")).unwrap();
-    assert!(error.contains("first difference at byte"));
-    assert_eq!(manifest["detail"], error);
-    assert_eq!(manifest["files"]["error.txt"]["bytes"], error.len());
-    assert_eq!(
-        manifest["files"]["error.txt"]["sha256"],
-        Sha256::digest(error.as_bytes())
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect::<String>()
+    assert_eq!(manifest["status"], "PASS");
+    assert_eq!(manifest["detail"], "");
+    assert!(
+        manifest["files"]
+            .as_object()
+            .unwrap()
+            .get("error.txt")
+            .is_none()
     );
     assert_eq!(
         manifest["not_checked"],

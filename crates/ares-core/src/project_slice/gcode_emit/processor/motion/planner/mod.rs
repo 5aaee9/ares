@@ -1,4 +1,6 @@
 use super::{MotionBlock, MotionKind};
+mod trapezoid;
+use trapezoid::block_time;
 
 #[derive(Clone, Copy)]
 struct PlannedBlock {
@@ -88,6 +90,32 @@ pub(super) fn planned_times(blocks: &[MotionBlock]) -> Vec<f64> {
     }
     times.extend(planner.finish());
     times
+}
+
+/// `TimeBlock::calculate_trapezoid()` + `time()` over one fixed profile
+/// (GCodeProcessor.cpp:255-274, GCodeProcessor.hpp:473-476).
+#[cfg(test)]
+pub(super) fn planned_trapezoid_time(
+    distance: f32,
+    cruise: f32,
+    entry: f32,
+    exit: f32,
+    acceleration: f32,
+) -> f32 {
+    block_time(PlannedBlock {
+        distance,
+        acceleration,
+        cruise,
+        entry,
+        exit,
+        max_entry: entry,
+        safe: exit,
+        time: 0.0,
+        nominal_length: false,
+        recalculate: false,
+        direction: [0.0; 4],
+        axis_feedrate: [0.0; 4],
+    })
 }
 
 fn plan(blocks: &mut [PlannedBlock]) {
@@ -309,38 +337,4 @@ fn xy_unit(direction: [f32; 4]) -> Option<[f32; 2]> {
 
 fn max_allowable_speed(acceleration: f32, target: f32, distance: f32) -> f32 {
     (target * target + 2.0 * acceleration * distance).sqrt()
-}
-
-fn block_time(block: PlannedBlock) -> f32 {
-    if block.distance == 0.0 {
-        return 0.0;
-    }
-    if block.acceleration == 0.0 {
-        // GCodeProcessor.cpp:130–158,255–274: zero accel/decel distances and
-        // times leave only cruise time (GCodeProcessor.hpp:439).
-        return if block.cruise != 0.0 {
-            block.distance / block.cruise
-        } else {
-            0.0
-        };
-    }
-    let accelerate = ((block.cruise * block.cruise - block.entry * block.entry)
-        / (2.0 * block.acceleration))
-        .max(0.0);
-    let decelerate = ((block.cruise * block.cruise - block.exit * block.exit)
-        / (2.0 * block.acceleration))
-        .max(0.0);
-    let cruise_distance = block.distance - accelerate - decelerate;
-    if cruise_distance >= 0.0 {
-        (block.cruise - block.entry) / block.acceleration
-            + cruise_distance / block.cruise.max(f32::MIN_POSITIVE)
-            + (block.cruise - block.exit) / block.acceleration
-    } else {
-        let accelerate = ((2.0 * block.acceleration * block.distance - block.entry * block.entry
-            + block.exit * block.exit)
-            / (4.0 * block.acceleration))
-            .clamp(0.0, block.distance);
-        let peak = (block.entry * block.entry + 2.0 * block.acceleration * accelerate).sqrt();
-        (peak - block.entry) / block.acceleration + (peak - block.exit) / block.acceleration
-    }
 }

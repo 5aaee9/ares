@@ -137,10 +137,14 @@ fn is_progress_motion(line: &str) -> bool {
 }
 
 #[cfg(test)]
+mod arc_cache_tests;
+#[cfg(test)]
 mod envelope_replay_tests;
 #[cfg(test)]
 mod seam_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod trapezoid_tests;
 #[cfg(test)]
 mod zero_acceleration_tests;
