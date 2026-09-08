@@ -315,6 +315,15 @@ fn block_time(block: PlannedBlock) -> f32 {
     if block.distance == 0.0 {
         return 0.0;
     }
+    if block.acceleration == 0.0 {
+        // GCodeProcessor.cpp:130–158,255–274: zero accel/decel distances and
+        // times leave only cruise time (GCodeProcessor.hpp:439).
+        return if block.cruise != 0.0 {
+            block.distance / block.cruise
+        } else {
+            0.0
+        };
+    }
     let accelerate = ((block.cruise * block.cruise - block.entry * block.entry)
         / (2.0 * block.acceleration))
         .max(0.0);

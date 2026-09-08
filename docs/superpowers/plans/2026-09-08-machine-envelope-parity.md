@@ -179,3 +179,62 @@ Zero-axis full timing parity is therefore not claimed. Artillery and the full
 all1001/options/artifacts/Tier1 goal remain incomplete; no failed, ignored or
 unexecuted case is credited as parity. Independent review/publication remains
 Coordinator-owned.
+
+## Wave14 P1 plan: zero-acceleration planner time
+
+Source owner: `GCodeProcessor.cpp:130–138,156–158,255–274` returns zero
+acceleration/deceleration distances and times for acceleration zero, leaving
+all distance at cruise; `GCodeProcessor.hpp:439` returns zero cruise time for
+zero cruise feedrate. Destination: `processor/motion/planner.rs::block_time`.
+The existing planner remains a temporary compatibility shell; libvgcode has no
+ownership here. This supersedes only the zero-arithmetic deferral above.
+
+Before production changes:
+1. Add separate behavioral tests for configured zero-Z linear and segmented
+   moves: exact finite block/total times, complete processor output and M73.
+   Derive expectations from the cited upstream expressions, not tolerances.
+   Run RED at `163decf0` and retain complete baseline envelope replay bytes.
+2. Short-circuit the zero-acceleration trapezoid to upstream cruise-only time,
+   including its zero-feedrate semantics. Keep every nonzero-acceleration
+   expression, scheduling, cache, emission and comparator unchanged.
+3. Run focused tests, full core, explicit envelope replays, fmt/clippy and WASM
+   compilation with owned targets and 900s bounds. Afinia must remain exact;
+   compare all baseline/final Artillery bytes and retain its known RED residual.
+   No full-fleet, fresh AppImage, or Tier1 runtime certification is implied.
+
+### Wave14 validation
+
+Implemented the zero-acceleration cruise-only branch without changing nonzero
+planner arithmetic or any existing assertions/reference bytes. Four separate
+source-derived behavioral tests cover the review's 10mm/10mm/s = 1s repro,
+two 60s linear blocks with exact `M73 P0 R2` / `M73 P50 R1`, helical segment
+cruise times and complete output, and upstream zero-cruise-feedrate time zero.
+
+Evidence in the owned worktree: `target/planner-nan-evidence/`; Cargo target
+`target/planner-nan`, each validation bounded by `timeout 900`.
+
+- RED `cargo nextest run -p ares-core -E 'test(zero_acceleration_tests)'
+  --no-fail-fast`: exit100, all four fail on nonfinite time (including explicit
+  `[NaN]` versus `[0.0]` for zero cruise). No expectations changed after RED.
+- Focused `cargo nextest run -p ares-core -E 'test(gcode_emit::processor)'
+  --no-fail-fast`: exit0, 51/51 pass including all four new tests.
+- Full `cargo nextest run -p ares-core --no-fail-fast`: exit0, 6814/6814 pass;
+  three ignored cases are not credited as coverage.
+- Baseline/final explicit envelope replays using the command/environment above:
+  exit100 each, Afinia and anchor PASS; Artillery remains RED at byte2665,
+  line149. Complete baseline/final actual bytes compare identical (`cmp`
+  exit0) for all three. Afinia actual/reference `cmp` exit0, 107618 bytes,
+  SHA256 `6cb5cc59480e0bafbdda8d862477f49b31232f1c139599e5b63da0c9a56ee6e7`.
+  Artillery actual is 907396 bytes, unchanged SHA256
+  `54de7c4cc5847ea4381776a52c8e03c972057fe8a3415ac2d543a8267dc75c18`;
+  full expected/input/actual and strict residual diff are retained, not PASS.
+- `cargo fmt --all`, `cargo fmt --all -- --check`,
+  `cargo clippy --workspace --all-targets`, and `cargo check --target
+  wasm32-unknown-unknown -p ares-core -p ares-wasm -p ares-vgcode`: exit0 each.
+  Existing unrelated warnings remain. No fresh AppImage, browser execution,
+  Windows/macOS runtime or full-workspace test run in this bounded correction.
+
+No production FS/env hooks, include macros, comparator/tolerance changes or
+fallbacks were added. Full all1001 actual-default/options/ordered-artifacts and
+Tier1 goal remains incomplete. Independent review and publication remain
+Coordinator-owned; this correction is only a candidate for that review.

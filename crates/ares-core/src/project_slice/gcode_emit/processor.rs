@@ -142,3 +142,5 @@ mod envelope_replay_tests;
 mod seam_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod zero_acceleration_tests;
