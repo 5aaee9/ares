@@ -115,7 +115,8 @@ pub(super) fn route(
     // Upstream restores the original endpoints after routing (which may nudge
     // them), then emits each interior point, even if formatting rounds two
     // distinct points to the same command. The caller appends the destination.
-    let interior_count = path.len() - 2;
+    // Polyline::append suppresses equal integer endpoints, yielding a singleton.
+    let interior_count = path.len().saturating_sub(2);
     for point in path.into_iter().skip(1).take(interior_count) {
         output.push(arc::Point {
             x: scale.unscale(point.x()) + offset.0,

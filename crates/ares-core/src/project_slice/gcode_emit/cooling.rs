@@ -207,7 +207,9 @@ impl CoolingState {
                     true,
                 )
             };
-            let replacement = if force || target != self.physical_part_speed {
+            // Inactive conditional STARTs emit nothing, even if another role
+            // changed the physical fan speed (CoolingBuffer.cpp:780,851–855).
+            let replacement = if force {
                 self.physical_part_speed = target;
                 let emitted = clamped_part_speed(target, self.part_cooling_fan_min_pwm);
                 format!("M106 S{}\n", part_fan_pwm(emitted)).into_bytes()

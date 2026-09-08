@@ -8,6 +8,7 @@ fn cooling_buffer_internal_bridge_end_forces_equal_speed_outer_wall_fan() {
         options: MotionOptions {
             enable_overhang_bridge_fan: true,
             overhang_fan_speed: 100,
+            internal_bridge_fan_speed: crate::options::InternalBridgeFanSpeed::new(50),
             overhang_fan_threshold: crate::RawOverhangFanThreshold::Percent0,
             ..MotionOptions::default()
         },
@@ -18,7 +19,9 @@ fn cooling_buffer_internal_bridge_end_forces_equal_speed_outer_wall_fan() {
     };
     let mut output = Vec::new();
     update_for_constant_path(&mut output, properties("Internal Bridge"), &mut state);
+    assert_eq!(output, b";__ARES_ROLE_FAN_FIXED_50__\n");
     output.clear();
+    state.physical_fan_speed = 50;
     state.layer_index = 64;
     update_for_constant_path(&mut output, properties("Outer wall"), &mut state);
     assert_eq!(

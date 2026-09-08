@@ -2,9 +2,8 @@
 //! conditional START; the final layer baseline still selects the fan speed.
 use super::super::*;
 
-#[test]
-fn cooling_buffer_role_end_emits_even_when_conditional_speed_does_not_exceed_baseline() {
-    let mut cooling = CoolingState {
+fn cooling_state() -> CoolingState {
+    CoolingState {
         part_speed: 100,
         physical_part_speed: 100,
         provisional_part_speed: 100,
@@ -34,7 +33,28 @@ fn cooling_buffer_role_end_emits_even_when_conditional_speed_does_not_exceed_bas
             },
             120.0,
         ),
-    };
+    }
+}
+
+#[test]
+fn cooling_buffer_inactive_start_then_forced_end_restores_explicit_internal_speed_once() {
+    let mut cooling = cooling_state();
+    cooling.physical_part_speed = 50;
+    let mut output = Vec::new();
+    for force in [false, true] {
+        append_deferred_role_fan(
+            &mut output,
+            DeferredRoleFan::Conditional { speed: 100, force },
+        );
+    }
+    cooling.resolve_role_fans(&mut output, 0, 100);
+    assert_eq!(output, b"M106 S255\n");
+    assert_eq!(cooling.physical_part_speed, 100);
+}
+
+#[test]
+fn cooling_buffer_role_end_emits_even_when_conditional_speed_does_not_exceed_baseline() {
+    let mut cooling = cooling_state();
     for (speed, baseline, force, expected) in [
         (100, 100, false, ""),
         (100, 100, true, "M106 S255\n"),

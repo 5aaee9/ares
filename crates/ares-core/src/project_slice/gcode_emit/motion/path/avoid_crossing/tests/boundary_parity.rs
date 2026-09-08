@@ -68,6 +68,69 @@ fn avoid_perimeters_inner_captured_retry_retains_backward_route() {
     );
 }
 
+#[test]
+fn travel_to_same_point_outside_safe_zone_has_no_interior() {
+    assert_route((4_890_000, 4_890_000), (4_890_000, 4_890_000), &[]);
+}
+
+#[test]
+fn start_travel_slope_z_at_same_xy_outside_safe_zone_emits_destination() {
+    use crate::project_slice::gcode_emit::motion::{
+        EmitState, MotionOptions, features::PathProperties, path::start_travel, scarf::Slope,
+    };
+
+    let slices = square();
+    let geometry = LayerGeometry {
+        avoid_crossing: crossing_geometry(&slices),
+        ..geometry()
+    };
+    let mut state = EmitState {
+        x: 4.89,
+        y: 4.89,
+        last_scaled_position: Some((4_890_000, 4_890_000)),
+        positioned: true,
+        layer_z: 1.0,
+        travel_feedrate: 6000.0,
+        options: MotionOptions {
+            reduce_crossing_wall: true,
+            retraction_minimum_travel: 1.0,
+            ..MotionOptions::default()
+        },
+        ..EmitState::default()
+    };
+    let mut output = Vec::new();
+    start_travel::emit(
+        &mut output,
+        &mut state,
+        start_travel::Request {
+            first_scaled: (4_890_000, 4_890_000),
+            first_x: 4.89,
+            first_y: 4.89,
+            properties: PathProperties {
+                mm3_per_mm: 0.04,
+                width: 0.22,
+                height: 0.25,
+                feature: "Outer wall",
+                is_perimeter: true,
+                end_clip: 0.0,
+                fitting: &[],
+                slope: Some(Slope {
+                    z_begin: 0.0,
+                    z_end: 1.0,
+                    e_begin: 0.0,
+                    e_end: 1.0,
+                    speed: 50.0,
+                    flow_ratio: 1.0,
+                }),
+            },
+            geometry,
+        },
+    );
+    assert_eq!(output, b"G1 X4.89 Y4.89 Z.75 F6000\n");
+    assert_eq!(state.scarf_z, Some(0.75));
+    assert_eq!(state.last_scaled_position, Some((4_890_000, 4_890_000)));
+}
+
 fn assert_route(start: (i64, i64), end: (i64, i64), expected: &[(i64, i64)]) {
     let slices = square();
     let geometry = LayerGeometry {

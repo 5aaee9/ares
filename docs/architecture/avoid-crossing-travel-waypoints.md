@@ -1,6 +1,65 @@
 # Avoid-crossing travel waypoint correction (scoped work plan)
 
-## Latest disposition: wave16 bounded seven-artifact parity
+## Latest disposition: wave17 independent-review P1 corrections
+
+Base `c90d3598ba2b023d9fb3cde8be0b83cfe2954da7`; scope is only the two
+independent route-review P1s. Upstream remains read-only Orca2.4.2 commit
+`8500fcdccaa10b5099ac20d252af3a7c560046f1`.
+
+- `Polyline.hpp:59–65::append(Point)` can return a singleton for equal integer
+  endpoints. Rust `motion/path/avoid_crossing.rs::route` now saturates the
+  interior count at zero, preserving append suppression and caller-owned
+  endpoints. The square `(4.89,4.89)` same-point route outside the safe zone
+  and the `start_travel.rs` equal-XY slope-Z caller both first panicked on
+  subtraction overflow; both now pass, including exact emitted XYZ bytes.
+- `GCode/CoolingBuffer.cpp:780,851–869` suppresses inactive conditional STARTs
+  regardless of physical fan speed, while END still forces emission. Rust
+  `gcode_emit/cooling.rs::resolve_role_fans` uses that emission condition alone;
+  physical speed differing from baseline no longer activates an inactive START.
+  A complete two-marker sequence with physical50/baseline100 first emitted two
+  `M106 S255` commands; it now emits one. The motion marker test also explicitly
+  sets internal-bridge speed50 and checks its preceding fixed-speed marker.
+
+No fan speed selection, timing, M73, cursor arithmetic, router append behavior,
+fixture, comparator, or rectangle-shell change. These are corrections to the
+cited libslic3r rewrite boundaries, not new Ares pipeline behavior; libvgcode is
+unchanged. Existing unavailable-geometry rectangle scaffolding is not expanded
+or accepted as parity. External/support/multi-region routing and logical
+re-scaling drift remain deferred.
+
+Evidence D (owned, with full artifacts, raw/normalized/ordered-XY diffs, effective
+exports, input/output identities, commands and real exits):
+`/home/indexyz/ares.pi-subagents-route-review-fixes-0ebec5a-143e-s0-t0/target/route-review-evidence/`.
+`D/replay.py` reuses the exact seven wave16 inputs and adds `internal-fan-50`,
+changing only one-wall's `internal_bridge_fan_speed` to `["50"]`. All eight
+references are fresh actual-AppImage executions, not copied/fake references.
+Actual executable SHA256:
+`64515d01f887b4797105530751a3ad59b0fa8537fbe3a294c420e1e14bba3b60`.
+Each reference and both candidate runs exit0. Complete artifacts and repeats
+are byte-identical after only independently shape/calendar-validated generator
+identity/timestamp normalization. Exact ordered XY counts: anchor770,
+two-walls623, translated770, solid-monotonicline1251, wipe-off699,
+solid-rectilinear770, one-wall436, internal-fan-50 436. Effective exports confirm
+explicit internal fan50 in both producers. No tolerance or fallback reference.
+
+Validation receipts in `D/logs/` (each command has a finite900s timeout):
+`01-tdd-red` exit100,5 passed/3 expected failures; `02-tdd-green` exit0,24 passed;
+`03-core-full` exit0,6831 passed/3 skipped,246.979s; `05-wasm` exit0,compile-only;
+`06-fresh-references` exit0,8 actual Orca executions; `07-cli-focused` exit0,6/6;
+`08-clippy` exit0,existing warnings; `09-full-replay` exit0,8/8 complete-green
+and stable repeats; `10-fmt` and `11-fmt-check` exit0. Receipt04 failed exit127
+because `python3` was absent from PATH; receipt06 reran with the explicit Nix
+Python executable. `12-audit`, `13-diff-check` and `14-empty-index` exit0:
+original seven input archives are exact; the new archive differs only in the
+explicit fan setting; touched Rust modules are at most263 physical lines.
+No failed/skipped/unexecuted case counts as coverage.
+
+This bounded eight-artifact pass does **not** complete the full1001-printer,
+default/legal-Boolean/Enum/range or Tier1 runtime goal. BrowserWASM is compile-
+only; Windows/macOS runtime validation remains open. Independent review and
+publication/main merge remain Coordinator-owned.
+
+## Historical disposition: wave16 bounded seven-artifact parity
 
 On published3c5cd20c plus the exact30-file shortest-direction partial, fresh
 actual-AppImage output reproduced six complete-green contexts and one-wall
