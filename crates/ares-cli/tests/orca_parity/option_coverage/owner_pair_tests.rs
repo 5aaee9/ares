@@ -19,7 +19,9 @@ fn actual_orca_owner_pair_exports_distinct_typed_widths() {
         return;
     }
     let root = parity::artifacts::root_from_env().unwrap();
-    let runner = OrcaRunner::from_env().expect("actual Orca and external artifacts required");
+    let runner = OrcaRunner::from_env()
+        .unwrap_or_else(|e| panic!("{e}"))
+        .expect("actual Orca and external artifacts required");
     let profiles = VendorProfiles::load(&profiles_root(), "Creality").unwrap();
     let selection =
         parity::select_printer(&profiles, "Creality", "Creality Ender-3 0.4 nozzle").unwrap();

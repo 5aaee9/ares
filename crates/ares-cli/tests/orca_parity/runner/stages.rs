@@ -1,13 +1,13 @@
 //! Native test-adapter stages; no process behavior is added to ares-core.
+use sha2::{Digest, Sha256};
 use std::{
-    io::Read,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Stage {
+    Initialization,
     Preset,
     Export,
     Slice,
@@ -92,8 +92,8 @@ pub(crate) fn attributable(output: &Captured, key: &str) -> bool {
                 .lines()
                 .any(|line| line.starts_with(&format!("{key}: ")));
     }
-    // Print::validate does not print opt_key for -51. Generic "Too small line
-    // width" is therefore NOT attributable. Only this unique bridge diagnostic is.
+    // Print::validate omits opt_key for -51. Generic "Too small line width"
+    // is not attributable; only this unique bridge diagnostic qualifies.
     output.code == Some(code(-51))
         && key == "bridge_line_width"
         && text
@@ -107,140 +107,63 @@ pub(crate) fn run(
     stage: Stage,
     work: &Path,
 ) -> Result<(), StageError> {
-    let io_error = |error| StageError::new(stage, FailureKind::Io, error);
-    let directory = tempfile::Builder::new()
-        .prefix("command-")
-        .tempdir_in(work)
-        .map_err(io_error)?
-        .keep();
-    let args: Vec<String> = args.into_iter().collect();
-    let environment = [
-        "ORCA_APPDIR",
-        "ORCA_LIB_CACHE",
-        "HOME",
-        "XDG_CONFIG_HOME",
-        "XDG_CACHE_HOME",
-        "LC_ALL",
-    ]
-    .into_iter()
-    .map(|key| {
-        (
-            key,
-            std::env::var_os(key).map(|value| value.to_string_lossy().into_owned()),
-        )
-    })
-    .collect::<std::collections::BTreeMap<_, _>>();
-    std::fs::write(
-        directory.join("command.json"),
-        serde_json::to_vec_pretty(&serde_json::json!({
-            "binary": bin, "args": args, "stage": format!("{stage:?}"),
-            "cwd": work, "timeout_seconds": 300, "environment": environment,
-        }))
-        .unwrap(),
-    )
-    .map_err(io_error)?;
-    let mut child = match Command::new(bin)
-        .args(&args)
-        .current_dir(work)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-    {
-        Ok(child) => child,
-        Err(error) => {
-            return finish(
-                &directory,
-                stage,
-                Some((FailureKind::Spawn, error.to_string())),
-                Captured {
-                    code: None,
-                    status: "not spawned".into(),
-                    stdout: vec![],
-                    stderr: vec![],
-                },
-            );
+    run_with_timeout(bin, args, stage, work, Duration::from_secs(300))
+}
+
+pub(super) fn run_with_timeout(
+    bin: &Path,
+    args: impl IntoIterator<Item = String>,
+    stage: Stage,
+    work: &Path,
+    timeout: Duration,
+) -> Result<(), StageError> {
+    super::command::run(bin, args, stage, work, timeout)
+}
+
+pub(super) fn capture_error(failure: &mut Option<(FailureKind, String)>, detail: String) {
+    match failure {
+        Some((FailureKind::Timeout | FailureKind::Wait, primary)) => {
+            primary.push_str(&format!("; capture I/O error: {detail}"));
         }
-    };
-    let drain = |mut pipe: Box<dyn Read + Send>| {
-        std::thread::spawn(move || {
-            let mut bytes = Vec::new();
-            let result = pipe.read_to_end(&mut bytes);
-            (bytes, result)
-        })
-    };
-    let stdout = drain(Box::new(child.stdout.take().unwrap()));
-    let stderr = drain(Box::new(child.stderr.take().unwrap()));
-    let deadline = Instant::now() + Duration::from_secs(300);
-    let (status, mut failure) = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break (Some(status), None),
-            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(25)),
-            wait => {
-                let reason = match wait {
-                    Err(error) => (FailureKind::Wait, error.to_string()),
-                    Ok(_) => (FailureKind::Timeout, "orca-slicer timed out".into()),
-                };
-                let kill = child.kill();
-                let reaped = child.wait();
-                let detail = format!("{}; kill={kill:?}; reap={reaped:?}", reason.1);
-                break (reaped.ok(), Some((reason.0, detail)));
-            }
-        }
-    };
-    let mut join =
-        |thread: std::thread::JoinHandle<(Vec<u8>, std::io::Result<usize>)>| match thread.join() {
-            Ok((bytes, result)) => {
-                if let Err(error) = result {
-                    failure = Some((FailureKind::Io, error.to_string()));
-                }
-                bytes
-            }
-            Err(_) => {
-                failure = Some((FailureKind::Io, "pipe drain panicked".into()));
-                vec![]
-            }
-        };
-    let stdout = join(stdout);
-    let stderr = join(stderr);
-    if failure.is_none() && status.is_some_and(|status| !status.success()) {
-        failure = Some((FailureKind::Process, "unsuccessful Orca process".into()));
+        _ => *failure = Some((FailureKind::Io, detail)),
     }
-    finish(
-        &directory,
-        stage,
-        failure,
-        Captured {
-            code: status.and_then(|status| status.code()),
-            status: status.map_or_else(|| "unavailable".into(), |status| status.to_string()),
-            stdout,
-            stderr,
-        },
-    )
 }
 
 pub(super) fn finish(
     directory: &Path,
     stage: Stage,
-    failure: Option<(FailureKind, String)>,
+    mut failure: Option<(FailureKind, String)>,
     captured: Captured,
 ) -> Result<(), StageError> {
-    let saved = (|| -> std::io::Result<()> {
-        std::fs::write(directory.join("stdout.bin"), &captured.stdout)?;
-        std::fs::write(directory.join("stderr.bin"), &captured.stderr)?;
-        std::fs::write(
-            directory.join("status.json"),
-            serde_json::to_vec_pretty(&serde_json::json!({
-                "code": captured.code, "native_status": captured.status,
-                "failure": failure.as_ref().map(|(kind, detail)| format!("{kind:?}: {detail}")),
-            }))
-            .unwrap(),
-        )
-    })();
-    let failure = match saved {
-        Ok(()) => failure,
-        Err(error) => Some((FailureKind::Io, error.to_string())),
+    for (name, bytes) in [
+        ("stdout.bin", &captured.stdout),
+        ("stderr.bin", &captured.stderr),
+    ] {
+        if let Err(error) = crate::artifacts::write(&directory.join(name), bytes) {
+            capture_error(&mut failure, error);
+        }
+    }
+    let hash = |bytes: &[u8]| {
+        Sha256::digest(bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
     };
+    let status = serde_json::json!({
+        "code": captured.code, "native_status": captured.status,
+        "failure": failure.as_ref().map(|(kind, detail)| format!("{kind:?}: {detail}")),
+        "snapshot_scope": "direct child output only; not process-tree completion",
+        "snapshot_incomplete": failure.as_ref().is_some_and(|(kind, _)| *kind != FailureKind::Process),
+        "live_captures": "stdout.live/stderr.live are non-authoritative and may continue changing after return",
+        "stdout": {"file": "stdout.bin", "bytes": captured.stdout.len(), "sha256": hash(&captured.stdout)},
+        "stderr": {"file": "stderr.bin", "bytes": captured.stderr.len(), "sha256": hash(&captured.stderr)},
+    });
+    if let Err(error) = crate::artifacts::write(
+        &directory.join("status.json"),
+        &serde_json::to_vec_pretty(&status).unwrap(),
+    ) {
+        capture_error(&mut failure, error);
+    }
     if let Some((kind, detail)) = failure {
         Err(StageError {
             stage,

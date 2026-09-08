@@ -156,3 +156,111 @@ all ordered artifacts, producer repairs and fresh Tier1 execution remain open.
 Legacy non-width generation stays unverified and cannot report complete PASS
 without effective-application proof. Independent six-axis review and any
 publication belong to the Coordinator; no global parity conclusion follows.
+
+## Independent-review follow-up plan (before changes)
+
+Resume clean `coord/parity-domains-w6` at d528739a0b61e5569de3722c090c0b18d65edc7d.
+The three review findings are accepted; no domain arithmetic, producer or
+comparator scope is reopened. Evidence goes under the existing isolated root's
+`review-fixes/`; its existing owned Cargo target may be reused.
+
+1. Red caller subprocess tests: an existing configured executable plus missing,
+   relative, repository-local or unwritable artifact destination must fail
+   initialization with its cause, never return a successful offline skip.
+   Change the runner to `Result<Option<_>, _>` and propagate errors through all
+   smoke/option callers. `None` remains only genuinely unconfigured operation;
+   explicitly requested sweeps require a configured/available runner.
+2. Red bounded launch test: a relative executable valid in the caller directory
+   must still launch after the command cwd changes. Resolve the executable at
+   the caller boundary and record its absolute path in command evidence.
+3. Red lifecycle test: a short-lived helper descendant inherits output handles
+   past direct-child termination. The command deadline must not wait for EOF.
+   Replace pipes/readers with file-backed capture and immutable, length-bounded
+   snapshots. Bound direct-child polling and shutdown/reaping; preserve primary
+   Timeout/Wait through later capture/persistence errors. Retain live capture
+   files but mark timeout snapshots incomplete and live files non-authoritative.
+   The Coordinator explicitly approved this portable solution: process-tree
+   termination is deferred, no native dependency is required, and no claim is
+   made that every descendant stopped. No reader threads are abandoned.
+4. Re-run focused runner/option/replay/ordered-byte regressions, fmt/clippy,
+   exact before/after bounded helper cases and one fresh actual owner export
+   pair (execution logic changed). Preserve all reference and producer failures.
+   Commit a normal fast-forward follow-up only after these regressions pass;
+   retain the old candidate and evidence, no amend/rebase/force/publication.
+
+Ownership remains test-only CLI orchestration around the cited libslic3r
+configuration/export boundary and OrcaSlicer.cpp CLI. Tier1 native std process
+and regular-file APIs are used; browser core remains untouched. Process-tree
+termination, full domain/default coverage, producer parity and fresh cross-OS
+execution remain deferred. Finite command deadlines assume responsive host
+filesystem/process APIs; no hard realtime guarantee for stalled kernel I/O.
+
+### Review-fix execution record
+
+`R=$E/review-fixes`. The original candidate, evidence and producer failures are
+retained unchanged. Rust/Cargo identities and isolated target remain as above.
+
+- Before fixes, focused Nextest for the new initialization/path/lifecycle tests
+  exits **100**, four failures (`R/red.log`). The caller regression observes
+  20 false successful smoke skips and four option failures missing the useful
+  root cause. Relative launch reports Spawn/ENOENT. A 500-ms timeout returns
+  after **3.03 seconds**, waiting for descendant-held pipe EOF. A separate
+  capture-persistence failure changes Timeout to Io. Saved red executable:
+  `99f869233f39cd305871392a9a4b769022aba20a0af7303e46892529a36609ca`;
+  `red-source-overlay.tar` and `red-tracked.patch` preserve its source, including
+  the timeout-parameter test seam (no lifecycle repair before the red run).
+- After fixes, the original four regressions pass. Focused runner/option/replay/
+  ordered-byte Nextest across both integration binaries exits **0**, 47 passed
+  (`R/focused.log`). Helper/offline entrypoints are not Orca/domain coverage.
+  `cargo clippy -p ares-cli --all-targets` exits **0**; only pre-existing core,
+  smoke nesting and unchanged compatibility-list warnings remain.
+- `R/verify-exact.py` exits **0**; `exact-results.json` retains all commands,
+  environment changes, binary hashes and statuses. Four original regressions
+  change **101 → 0**; explicit printer sweep initialization with each bad root
+  changes **0 → 101**, before any inventory/case execution. Initialization is
+  also exercised through selected printer/process, cluster, dump and option
+  callers, not just option coverage.
+- The safe descendant helper stays alive for three seconds; the repaired
+  command call returns in **519.6 ms**, preserving Timeout, captured binary
+  prefixes, `kill=Ok`, and a reaped direct child. The test then waits for the
+  bounded descendant's completion marker. Retained artifacts under `R/tmp/
+  lifecycle-*` include immutable snapshots, full command/status/lifecycle JSON,
+  and continuing live files. Late descendant output changes the live file but
+  not either snapshot. Status marks the snapshot incomplete and live files
+  non-authoritative. Primary Timeout/Wait is preserved through later capture
+  errors; non-lifecycle capture failures fail closed as Io.
+- Shutdown polls for at most a two-second grace after kill. If a child cannot
+  be observed reaped, its PID and unreaped state remain recorded and the stage
+  fails; it is never input rejection or PASS. There is no process-tree kill
+  guarantee and no abandoned reader thread. Snapshot reads are bounded by the
+  observed file length, not EOF or subsequent descendant output.
+- One fresh actual owner pair ran because execution logic changed:
+  `bash $R/run-owner-pair.sh` exits **0**; four Orca stages exit **0**, all direct
+  children observed reaped. `R/actual-owner-pair` retains original/written
+  presets, model, commands, live captures, immutable stdout/stderr snapshots,
+  statuses/hashes, archives, full reference G-code and application/producer
+  manifests. Executable SHA-256 for this run:
+  `b1f9979f247a804f3756b061bb72bacd19c737914ca40afeb9b71480b816e834`;
+  the supplied AppImage and wrapper hashes remain unchanged. No source-built
+  reference or extra physical-equivalence substitution is used.
+- Both requests still export exactly `0.6`/percent=false and `150%`/percent=true,
+  with nozzle[0.4], layer0.2, thick flags0/0 and solid-infill width0. New project
+  hashes are `47672ffe3e0c321e161c5471984eb84c448c78a61a38df3e2b81328f0aaa233b`
+  and `47a01f896c1b3c27ae2c2730ca8517d8665e609143231013f01d96943192c113`;
+  reference hashes are `b60fe73925d078274b0759a3102c593617a6bc46235d6e16c76ca9c040cb9398`
+  and `f666551149f6ae7459f175296b8a0983ec5cd2ecb6f88ca8e12ee100826c2ffd`.
+  Both Ares attempts remain **ARES_ERROR wall_generator**, zero strict
+  comparisons and zero completed width domains.
+- Exact owner and retained-classic replays stay **101 → 101**. Classic still
+  diverges at byte863/line32 (M73); complete paired bytes, errors and raw diffs
+  remain under `R/strict-*`. The prior native/browser KSR timing failures and
+  their complete artifacts remain at the original evidence root; no KSR or
+  fresh cross-platform success is inferred from this follow-up.
+
+Only initialization propagation, executable path resolution and bounded command
+capture/shutdown are included in this follow-up. No domain arithmetic, producer,
+strict comparator, fixture or upstream changes are made. Fresh Windows/macOS/
+browser execution, descendant process-tree termination, all-printer/default/
+legal-option coverage and complete ordered-output parity remain open. This is
+a local fast-forward review candidate, not Coordinator publication or global
+acceptance.

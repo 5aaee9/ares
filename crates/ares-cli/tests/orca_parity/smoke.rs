@@ -16,10 +16,9 @@ fn orca_parity_nearest_cluster_check() {
         eprintln!("skipping: set ARES_PARITY_CLUSTER=1");
         return;
     }
-    let Some(runner) = OrcaRunner::from_env() else {
-        eprintln!("skipping: no OrcaSlicer CLI available");
-        return;
-    };
+    let runner = OrcaRunner::from_env()
+        .unwrap_or_else(|e| panic!("{e}"))
+        .expect("explicit cluster requires an Orca executable");
     let targets = [
         ("Anycubic", "Anycubic Kobra 2 Neo 0.4 nozzle"),
         ("Anycubic", "Anycubic Kobra 3 0.4 nozzle"),
@@ -220,7 +219,7 @@ fn orca_parity_artillery_x3_pro_smoke() {
 
 #[test]
 fn orca_parity_prusa_core_one_dump() {
-    let Some(runner) = OrcaRunner::from_env() else {
+    let Some(runner) = OrcaRunner::from_env().unwrap_or_else(|e| panic!("{e}")) else {
         eprintln!("skipping: no OrcaSlicer CLI available");
         return;
     };
@@ -245,7 +244,7 @@ fn orca_parity_ratrig_vcast_smoke() {
 }
 
 fn assert_printer_smoke(vendor: &str, printer: &str) {
-    let Some(runner) = OrcaRunner::from_env() else {
+    let Some(runner) = OrcaRunner::from_env().unwrap_or_else(|e| panic!("{e}")) else {
         eprintln!("skipping: no OrcaSlicer CLI available");
         return;
     };
@@ -261,7 +260,7 @@ fn assert_printer_smoke(vendor: &str, printer: &str) {
 }
 
 fn assert_process_option_smoke(key: &str, value: &str) {
-    let Some(runner) = OrcaRunner::from_env() else {
+    let Some(runner) = OrcaRunner::from_env().unwrap_or_else(|e| panic!("{e}")) else {
         return;
     };
     let profiles = VendorProfiles::load(&profiles_root(), "Creality").unwrap();
@@ -305,10 +304,9 @@ fn orca_parity_printer_sweep() {
         eprintln!("skipping: set ARES_PARITY_SWEEP=1 to run the full printer sweep");
         return;
     }
-    let Some(runner) = OrcaRunner::from_env() else {
-        eprintln!("skipping: no OrcaSlicer CLI available");
-        return;
-    };
+    let runner = OrcaRunner::from_env()
+        .unwrap_or_else(|e| panic!("{e}"))
+        .expect("explicit sweep requires an Orca executable");
     let root = profiles_root();
     let model = cube_model();
     let mut outcomes = Vec::new();

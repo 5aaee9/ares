@@ -8,6 +8,7 @@ fn orca_parity_option_coverage() {
         return;
     }
     let runner = OrcaRunner::from_env()
+        .unwrap_or_else(|e| panic!("{e}"))
         .expect("explicit option coverage requires Orca and external artifacts");
     let profiles = VendorProfiles::load(&profiles_root(), "Creality").unwrap();
     let selection =

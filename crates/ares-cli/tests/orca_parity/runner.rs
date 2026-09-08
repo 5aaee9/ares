@@ -12,6 +12,15 @@ pub(crate) mod application;
 #[path = "runner/application_tests.rs"]
 mod application_tests;
 #[cfg(test)]
+#[path = "runner/initialization_tests.rs"]
+mod initialization_tests;
+#[cfg(test)]
+#[path = "runner/lifecycle_tests.rs"]
+mod lifecycle_tests;
+#[cfg(test)]
+#[path = "runner/path_tests.rs"]
+mod path_tests;
+#[cfg(test)]
 #[path = "runner/stage_tests.rs"]
 mod stage_tests;
 #[path = "runner/stages.rs"]
@@ -19,6 +28,9 @@ pub(crate) mod stages;
 #[cfg(test)]
 #[path = "runner/tests.rs"]
 mod tests;
+
+#[path = "runner/command.rs"]
+mod command;
 
 use stages::{FailureKind, Stage, StageError};
 
@@ -50,26 +62,28 @@ pub(super) struct CaseInputs<'a> {
 }
 
 impl OrcaRunner {
-    /// Returns None when no OrcaSlicer binary is configured so the parity
-    /// suite can skip.
-    pub(super) fn from_env() -> Option<Self> {
-        let bin = std::env::var_os("ARES_ORCA_BIN")
+    /// Only absent configuration returns None; initialization errors must fail callers.
+    pub(super) fn from_env() -> Result<Option<Self>, StageError> {
+        let Some(bin) = std::env::var_os("ARES_ORCA_BIN")
             .map(PathBuf::from)
             .or_else(|| {
                 let script = repo_root().join("scripts/orca-parity.sh");
                 script.exists().then_some(script)
-            })?;
-        if !bin.exists() {
-            eprintln!("ares-parity: ARES_ORCA_BIN {:?} not found; skipping", bin);
-            return None;
-        }
-        let root = crate::artifacts::root_from_env().ok()?;
+            })
+        else {
+            return Ok(None);
+        };
+        let init_error = |detail| StageError::new(Stage::Initialization, FailureKind::Io, detail);
+        let bin = bin
+            .canonicalize()
+            .map_err(|error| init_error(format!("configured Orca executable {bin:?}: {error}")))?;
+        let root = crate::artifacts::root_from_env().map_err(init_error)?;
         let work = tempfile::Builder::new()
             .prefix("orca-runner-")
-            .tempdir_in(root)
-            .ok()?
+            .tempdir_in(&root)
+            .map_err(|error| init_error(format!("runner work directory under {root:?}: {error}")))?
             .keep();
-        Some(Self { bin, work })
+        Ok(Some(Self { bin, work }))
     }
 
     /// Flattened preset overrides applied on top of the base presets before
