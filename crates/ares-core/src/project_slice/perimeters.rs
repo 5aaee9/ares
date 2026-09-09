@@ -38,12 +38,14 @@ pub(super) fn prepare_post_classic_prelude<'a>(
     classic::finish_classic_prelude(prepare_post_perimeter_inputs(project.into_source())?)
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn prepare_post_classic_top_split<'a>(
     project: impl ProjectBytes<'a>,
 ) -> Result<classic::PreparedPostClassicTopSplit, SliceError> {
     classic::finish_classic_top_split(prepare_post_classic_prelude(project.into_source())?)
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn prepare_post_classic_onion<'a>(
     project: impl ProjectBytes<'a>,
 ) -> Result<Box<classic::PreparedPostClassicOnion>, SliceError> {
@@ -52,6 +54,7 @@ pub(super) fn prepare_post_classic_onion<'a>(
     )?))
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn prepare_post_classic_hierarchy<'a>(
     project: impl ProjectBytes<'a>,
 ) -> Result<Box<classic::PreparedPostClassicHierarchy>, SliceError> {
@@ -60,6 +63,7 @@ pub(super) fn prepare_post_classic_hierarchy<'a>(
     )))
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn prepare_post_classic_traversal<'a>(
     project: impl ProjectBytes<'a>,
 ) -> Result<Box<classic::PreparedPostClassicTraversal>, SliceError> {
@@ -68,12 +72,14 @@ pub(super) fn prepare_post_classic_traversal<'a>(
     )))
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn prepare_post_classic_raw_paths<'a>(
     project: impl ProjectBytes<'a>,
 ) -> Result<classic::PreparedPostClassicRawPaths, SliceError> {
     classic::finish_classic_raw_paths(prepare_post_classic_traversal(project.into_source())?)
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn prepare_post_classic_chained_loops<'a>(
     project: impl ProjectBytes<'a>,
 ) -> Result<classic::PreparedPostClassicChainedLoops, SliceError> {
@@ -82,6 +88,7 @@ pub(super) fn prepare_post_classic_chained_loops<'a>(
     ))
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn prepare_post_classic_entity_collections<'a>(
     project: impl ProjectBytes<'a>,
 ) -> Result<classic::PreparedPostClassicEntityCollections, SliceError> {
@@ -90,6 +97,7 @@ pub(super) fn prepare_post_classic_entity_collections<'a>(
     ))
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn prepare_post_classic_perimeter_append<'a>(
     project: impl ProjectBytes<'a>,
 ) -> Result<classic::PreparedPostClassicPerimeterAppend, SliceError> {
@@ -98,6 +106,7 @@ pub(super) fn prepare_post_classic_perimeter_append<'a>(
     ))
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn prepare_post_classic_gap_domain<'a>(
     project: impl ProjectBytes<'a>,
 ) -> Result<classic::PreparedPostClassicGapDomain, SliceError> {
@@ -106,32 +115,62 @@ pub(super) fn prepare_post_classic_gap_domain<'a>(
     )?)
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn prepare_post_classic_medial_gap<'a>(
     project: impl ProjectBytes<'a>,
 ) -> Result<classic::PreparedPostClassicMedialGap, SliceError> {
     classic::finish_classic_medial_gap(prepare_post_classic_gap_domain(project.into_source())?)
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn prepare_post_classic_gap_extrusion<'a>(
     project: impl ProjectBytes<'a>,
 ) -> Result<classic::PreparedPostClassicGapExtrusion, SliceError> {
     classic::finish_classic_gap_extrusion(prepare_post_classic_medial_gap(project.into_source())?)
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn prepare_post_classic_infill_boundary<'a>(
     project: impl ProjectBytes<'a>,
 ) -> Result<classic::PreparedPostClassicInfillBoundary, SliceError> {
-    classic::finish_classic_infill_boundary(prepare_post_classic_gap_extrusion(
-        project.into_source(),
-    )?)
+    classic_infill_boundary(prepare_post_classic_prelude(project.into_source())?)
+}
+
+fn classic_infill_boundary(
+    prelude: classic::PreparedPostClassicPrelude,
+) -> Result<classic::PreparedPostClassicInfillBoundary, SliceError> {
+    let top_split = classic::finish_classic_top_split(prelude)?;
+    let onion = classic::finish_classic_onion(top_split)?;
+    let hierarchy = classic::finish_classic_hierarchy(onion);
+    let traversal = classic::finish_classic_traversal(hierarchy);
+    let raw_paths = classic::finish_classic_raw_paths(Box::new(traversal))?;
+    let chained_loops = classic::finish_classic_chained_loops(raw_paths);
+    let entity_collections = classic::finish_classic_entity_collections(chained_loops);
+    let perimeter_append = classic::finish_classic_perimeter_append(entity_collections);
+    let gap_domain = classic::finish_classic_gap_domain(perimeter_append)?;
+    let medial_gap = classic::finish_classic_medial_gap(gap_domain)?;
+    let gap_extrusion = classic::finish_classic_gap_extrusion(medial_gap)?;
+    classic::finish_classic_infill_boundary(gap_extrusion)
 }
 
 pub(super) fn prepare_post_layer_region_perimeters<'a>(
     project: impl ProjectBytes<'a>,
 ) -> Result<layer_region::PreparedPostLayerRegionPerimeters, SliceError> {
-    Ok(layer_region::finish(prepare_post_classic_infill_boundary(
-        project,
-    )?))
+    // `LayerRegion::make_perimeters` dispatches `process_arachne` per region
+    // (`LayerRegion.cpp:104-115`); the classic chain remains the shared
+    // context spine and arachne records materialize through
+    // `PerimeterGenerator::process_arachne` (`PerimeterGenerator.cpp:2093`).
+    let prelude = prepare_post_classic_prelude(project)?;
+    let arachne = arachne::materialize::finish(&prelude)?;
+    let has_arachne = arachne
+        .objects
+        .iter()
+        .any(|object| object.records.iter().any(Option::is_some));
+    let infill_boundary = classic_infill_boundary(prelude)?;
+    Ok(layer_region::finish_with_arachne(
+        infill_boundary,
+        has_arachne.then_some(arachne),
+    ))
 }
 
 pub(super) fn finish_post_perimeter_inputs(

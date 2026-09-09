@@ -19,10 +19,13 @@ async fn fuzzy_skin_reaches_active_classic_output() {
 #[tokio::test]
 async fn task22o1_preflight_rejects_each_activated_deferred_classic_branch() {
     let cases = [
+        // Arachne dispatch itself is enabled; the KSR configuration hits
+        // the arachne first-slice scope gate (`PerimeterGenerator.cpp:2168-
+        // 2224` top-surface regeneration stays deferred).
         (
             "\"wall_generator\": \"classic\"",
             "\"wall_generator\": \"arachne\"",
-            "wall_generator",
+            "only_one_wall_top",
         ),
         (
             "\"counterbore_hole_bridging\": \"none\"",

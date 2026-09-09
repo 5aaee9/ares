@@ -15,13 +15,11 @@ use crate::{
 };
 
 const SPLIT_TOLERANCE_MM: f64 = 0.05;
-#[cfg_attr(not(test), allow(dead_code))]
 const MERGE_TOLERANCE_MM: f64 = 1e-4;
 
 /// `extrusion_paths_append(dst, extrusion, role, flow)`
 /// (`Arachne/utils/ExtrusionLine.cpp:298-302`): append the constant-width
 /// sub-paths of one variable-width arachne wall line.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(in crate::project_slice) fn append_extrusion_paths(
     destination: &mut Vec<ExtrusionPath>,
     extrusion: &ExtrusionLine,
@@ -35,6 +33,49 @@ pub(in crate::project_slice) fn append_extrusion_paths(
         flow,
         scale,
     )?);
+    Ok(())
+}
+
+/// `extrusion_paths_append(dst, ClipperLib_Z::Paths, role, flow)`
+/// (`Arachne/utils/ExtrusionLine.cpp:290-296`): append the constant-width
+/// sub-paths of overhang-clipped wall lines whose vertices carry the width
+/// as the Z coordinate.
+pub(in crate::project_slice) fn append_clipped_paths(
+    destination: &mut Vec<ExtrusionPath>,
+    clipped: &[Vec<(i64, i64, i64)>],
+    role: ExtrusionRole,
+    flow: Flow,
+    scale: CoordinateScale,
+) -> Result<(), SliceError> {
+    for path in clipped {
+        let path = path.as_slice();
+        // `to_thick_polyline(ClipperLib_Z::Path)`
+        // (`Arachne/utils/ExtrusionLine.hpp:203-221`).
+        let mut points = Vec::with_capacity(path.len());
+        let mut widths = Vec::with_capacity(2 * path.len().saturating_sub(1));
+        if let [first, second, ..] = path {
+            points.push(Point::new(first.0, first.1));
+            widths.push(first.2 as f64);
+            points.push(Point::new(second.0, second.1));
+            widths.push(second.2 as f64);
+        }
+        for pair in path[1..].windows(2) {
+            points.push(Point::new(pair[1].0, pair[1].1));
+            widths.push(pair[0].2 as f64);
+            widths.push(pair[1].2 as f64);
+        }
+        let thick_polyline = ThickPolyline {
+            points,
+            width: widths,
+            endpoints: (false, false),
+        };
+        destination.extend(thick_polyline_to_multi_path(
+            &thick_polyline,
+            role,
+            flow,
+            scale,
+        )?);
+    }
     Ok(())
 }
 

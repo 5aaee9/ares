@@ -37,7 +37,7 @@ fn flow(height: f32) -> Flow {
     }
 }
 
-fn context() -> TraverseExtrusionsContext {
+fn context() -> TraverseExtrusionsContext<'static> {
     TraverseExtrusionsContext {
         layer_id: 2,
         raft_layers: 0,
@@ -48,6 +48,8 @@ fn context() -> TraverseExtrusionsContext {
         fuzzy_skin: FuzzySkinConfig::disabled(),
         perimeter_flow: flow(0.3),
         ext_perimeter_flow: flow(0.2),
+        overhang_flow: flow(0.3),
+        lower_slices_polygons: &[],
         scale: SCALE,
     }
 }
@@ -295,11 +297,40 @@ fn steep_overhang_flags_follow_odd_reversing_layers_without_detection() {
 }
 
 #[test]
-fn overhang_clipping_branch_fails_closed() {
+fn overhang_clipping_keeps_widths_for_covered_walls() {
+    // `clip_extrusion` (`PerimeterGenerator.cpp:391-419`): a wall fully
+    // inside the grown lower slices clips without crossings, so the width
+    // survives and the loop materializes.
+    let lower: &[crate::geometry::Polygon] = &[crate::geometry::Polygon::new(vec![
+        crate::geometry::Point::new(-1_000_000, -1_000_000),
+        crate::geometry::Point::new(2_000_000, -1_000_000),
+        crate::geometry::Point::new(2_000_000, 2_000_000),
+        crate::geometry::Point::new(-1_000_000, 2_000_000),
+    ])];
     let mut context = context();
     context.detect_overhang_wall = true;
+    context.lower_slices_polygons = lower;
+    let outcome = traverse_extrusions(vec![wall(0, true, true, &rectangle(450_000))], &context)
+        .expect("a covered wall clips through the Z path");
+    assert_eq!(outcome.collection.entities.len(), 1);
+}
+
+#[test]
+fn overhang_clipping_fails_closed_on_interpolated_crossings() {
+    // A wall crossing the lower-slice boundary needs the upstream ZFill
+    // width interpolation (`PerimeterGenerator.cpp:311-357`); sentinel
+    // widths fail closed instead of emitting an approximation.
+    let lower: &[crate::geometry::Polygon] = &[crate::geometry::Polygon::new(vec![
+        crate::geometry::Point::new(500_000, -1_000_000),
+        crate::geometry::Point::new(2_000_000, -1_000_000),
+        crate::geometry::Point::new(2_000_000, 2_000_000),
+        crate::geometry::Point::new(500_000, 2_000_000),
+    ])];
+    let mut context = context();
+    context.detect_overhang_wall = true;
+    context.lower_slices_polygons = lower;
     let error = traverse_extrusions(vec![wall(0, true, true, &rectangle(450_000))], &context)
-        .expect_err("the Z-interpolating overhang branch is a later seam");
+        .expect_err("a boundary crossing needs the ZFill seam");
     assert!(
         matches!(error, SliceError::UnsupportedProjectFeature(ref key) if key == "detect_overhang_wall")
     );

@@ -5,8 +5,14 @@
 // `ExtrusionEntityCollection` vocabulary of seam 2. Arachne dispatch stays
 // typed-rejected; wall generation and overhang clipping are later seams.
 
-mod traverse;
+pub(in crate::project_slice) mod config;
+pub(in crate::project_slice) mod materialize;
+pub(in crate::project_slice) mod order;
+pub(in crate::project_slice) mod traverse;
 pub(in crate::project_slice) mod variable_width;
+pub(in crate::project_slice) mod walls;
+
+pub(in crate::project_slice) use materialize::PreparedArachnePerimeters;
 
 // Constructed only by the seam tests until the arachne materialization
 // transaction (`PerimeterGenerator.cpp:2093-2519`) dispatches here.

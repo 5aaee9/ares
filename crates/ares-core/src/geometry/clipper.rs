@@ -23,6 +23,7 @@ mod types;
 mod variable_offset;
 mod winding;
 pub(in crate::geometry) mod z;
+pub(crate) mod z_clip;
 
 #[cfg(test)]
 pub(super) use boolean_ex::safety_offset_configuration_for_test;

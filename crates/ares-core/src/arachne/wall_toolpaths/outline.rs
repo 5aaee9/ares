@@ -20,7 +20,7 @@ pub(super) fn prepare(
     if normalized.is_empty() {
         return Ok(Vec::new());
     }
-    let allowed_distance = config.coordinate_scale.checked_scale(0.025).unwrap();
+    let allowed_distance = config.wall_maximum_deviation;
     let epsilon_offset = allowed_distance / 2 - 1;
     let contracted = offset_paths(&normalized, -(epsilon_offset as f32), JoinType::Miter, 3.0)?;
     let expanded = offset_paths(
@@ -30,8 +30,8 @@ pub(super) fn prepare(
         3.0,
     )?;
     let restored = offset_paths(&expanded, -(epsilon_offset as f32), JoinType::Miter, 3.0)?;
-    let maximum_resolution = config.coordinate_scale.checked_scale(0.5).unwrap();
-    let maximum_deviation = config.coordinate_scale.checked_scale(0.025).unwrap();
+    let maximum_resolution = config.wall_maximum_resolution;
+    let maximum_deviation = config.wall_maximum_deviation;
     let mut simplified = restored
         .into_iter()
         .filter_map(normalize_polygon)

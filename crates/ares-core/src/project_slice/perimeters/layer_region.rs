@@ -23,8 +23,20 @@ thread_local! {
     static FINISH_INVOCATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(in crate::project_slice) fn finish(
     prepared: PreparedPostClassicInfillBoundary,
+) -> PreparedPostLayerRegionPerimeters {
+    finish_with_arachne(prepared, None)
+}
+
+/// `LayerRegion::make_perimeters` dispatches per region
+/// (`LayerRegion.cpp:82-142`): classic records keep their classic results,
+/// arachne records take the entities materialized by `process_arachne`
+/// (`PerimeterGenerator.cpp:2093-2519`).
+pub(in crate::project_slice) fn finish_with_arachne(
+    prepared: PreparedPostClassicInfillBoundary,
+    arachne: Option<crate::project_slice::perimeters::arachne::PreparedArachnePerimeters>,
 ) -> PreparedPostLayerRegionPerimeters {
     #[cfg(test)]
     FINISH_INVOCATIONS.with(|count| count.set(count.get() + 1));
@@ -34,7 +46,13 @@ pub(in crate::project_slice) fn finish(
         predecessor,
         objects,
     } = prepared;
-    let objects = objects.into_iter().map(materialize_object).collect();
+    let mut arachne_objects = arachne.map(|arachne| arachne.objects).unwrap_or_default();
+    arachne_objects.resize_with(objects.len(), Default::default);
+    let objects = objects
+        .into_iter()
+        .zip(arachne_objects)
+        .map(|(source, arachne)| materialize_object(source, arachne.records))
+        .collect();
     PreparedPostLayerRegionPerimeters {
         predecessor: PostPerimeterPredecessor::Classic(predecessor),
         objects,
@@ -73,12 +91,20 @@ fn validate_alignment(prepared: &PreparedPostClassicInfillBoundary) {
 
 pub(in crate::project_slice) fn materialize_object(
     source: PreparedInfillBoundaryObject,
+    mut arachne: Vec<Option<PreparedLayerRegionPerimeterRecord>>,
 ) -> PreparedLayerRegionPerimeterObject {
+    arachne.resize_with(source.records.len(), || None);
     PreparedLayerRegionPerimeterObject {
         records: source
             .records
             .into_iter()
-            .map(|record| record.map(materialize_record))
+            .zip(arachne)
+            .map(|(record, arachne)| match (record, arachne) {
+                (Some(_), Some(arachne)) => Some(arachne),
+                (Some(record), None) => Some(materialize_record(record)),
+                (None, None) => None,
+                (None, Some(_)) => unreachable!("arachne records align with classic records"),
+            })
             .collect(),
     }
 }

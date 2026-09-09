@@ -1,0 +1,69 @@
+{
+  "status": "executed-public-red-not-parity",
+  "source": "8500fcdccaa10b5099ac20d252af3a7c560046f1",
+  "ares_base": "37159663447569aaff248fab5c4a23b487bdfe77",
+  "cwd": "/home/indexyz/ares.pi-subagents-arachne-first-slice-aab21e8-7ce2-s0-t0",
+  "path_notation": "argv below is expanded by replacing $W with cwd, exactly as the executed shell commands expanded $PWD",
+  "runtime": "/tmp/squashfs-root/bin/orca-slicer",
+  "runtime_sha256": "64515d01f887b4797105530751a3ad59b0fa8537fbe3a294c420e1e14bba3b60",
+  "wrapper": "/home/indexyz/ares/scripts/orca-parity.sh",
+  "wrapper_sha256": "01764d2db02c6febcb8f16992bbe34482bfb180ba9205956c5700fc588186932",
+  "environment": {
+    "ORCA_APPDIR": "/tmp/squashfs-root",
+    "ORCA_LIB_CACHE": "$W/.arachne-evidence/libs.cache",
+    "XDG_CONFIG_HOME": "$W/.arachne-evidence/state",
+    "XDG_CACHE_HOME": "$W/.arachne-evidence/state"
+  },
+  "selection": {
+    "machine": "Snapmaker A250 (0.4 nozzle)",
+    "process": "0.16 Optimal @Snapmaker (0.4 nozzle)",
+    "filament": "Snapmaker PLA",
+    "overrides": []
+  },
+  "export": {
+    "argv": [
+      "/home/indexyz/ares/scripts/orca-parity.sh",
+      "--datadir", "$W/.arachne-evidence/state",
+      "--load-settings", "$W/tests/parity/arachne/machine.json;$W/tests/parity/arachne/process.json",
+      "--load-filaments", "$W/tests/parity/arachne/filament.json",
+      "--arrange", "1",
+      "--export-3mf", "$W/tests/parity/arachne/default-prisms.3mf",
+      "$W/tests/parity/arachne/wide.stl",
+      "$W/tests/parity/arachne/neck.stl",
+      "$W/tests/parity/arachne/hole.stl"
+    ],
+    "exit": 0,
+    "log": ".arachne-evidence/export-snapmaker.log"
+  },
+  "slice": {
+    "argv": [
+      "/home/indexyz/ares/scripts/orca-parity.sh",
+      "--datadir", "$W/.arachne-evidence/state",
+      "--slice", "0",
+      "--outputdir", "$W/.arachne-evidence/reference",
+      "$W/tests/parity/arachne/default-prisms.3mf"
+    ],
+    "exit": 0,
+    "log": ".arachne-evidence/slice-snapmaker.log",
+    "result": ".arachne-evidence/reference/result.json",
+    "reference_source": ".arachne-evidence/reference/plate_1.gcode"
+  },
+  "effective_export": {
+    "entry": "Metadata/project_settings.config",
+    "wall_generator": "arachne",
+    "wall_sequence": "inner wall/outer wall",
+    "precise_outer_wall": "1",
+    "wall_loops": "3",
+    "only_one_wall_top": "0",
+    "only_one_wall_first_layer": "0",
+    "fuzzy_skin": "none",
+    "post_process": []
+  },
+  "public_red": {
+    "command": "CARGO_TARGET_DIR=$W/target/arachne timeout 900 cargo nextest run -p ares-core --test arachne_default_prisms",
+    "exit": 100,
+    "result": "ARES_ERROR: UnsupportedProjectFeature(\"wall_generator\")",
+    "log": ".arachne-evidence/public-red.log"
+  },
+  "input_output_sha256": "SHA256SUMS"
+}

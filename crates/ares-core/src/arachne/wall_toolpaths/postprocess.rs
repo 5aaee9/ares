@@ -1,6 +1,6 @@
 use crate::{
-    arachne::extrusion_line::ExtrusionLine,
-    geometry::{CoordinateScale, Point, Polygon, union_even_odd_polygons_paths},
+    arachne::{ExtrusionLine, wall_toolpaths::RawWallToolPathConfig},
+    geometry::{Point, Polygon, union_even_odd_polygons_paths},
 };
 
 pub(super) fn remove_small_lines(
@@ -32,16 +32,19 @@ pub(super) fn remove_small_lines(
     }
 }
 
-pub(super) fn simplify_toolpaths(toolpaths: &mut [Vec<ExtrusionLine>], scale: CoordinateScale) {
-    let maximum_resolution = scale.checked_scale(0.5).unwrap();
-    let maximum_deviation = scale.checked_scale(0.025).unwrap();
-    let maximum_extrusion_area_deviation = scale.checked_scale(2.0).unwrap();
+pub(super) fn simplify_toolpaths(
+    toolpaths: &mut [Vec<ExtrusionLine>],
+    config: RawWallToolPathConfig,
+) {
+    let maximum_resolution = config.wall_maximum_resolution;
+    let maximum_deviation = config.wall_maximum_deviation;
+    let maximum_extrusion_area_deviation = config.coordinate_scale.checked_scale(2.0).unwrap();
     for line in toolpaths.iter_mut().flatten() {
         line.simplify(
             maximum_resolution * maximum_resolution,
             maximum_deviation * maximum_deviation,
             maximum_extrusion_area_deviation,
-            scale,
+            config.coordinate_scale,
         );
     }
 }
@@ -100,7 +103,31 @@ mod tests {
         geometry::{CoordinateScale, Point},
     };
 
-    use super::{remove_small_lines, separate_inner_contour, simplify_toolpaths};
+    use super::{
+        RawWallToolPathConfig, remove_small_lines, separate_inner_contour, simplify_toolpaths,
+    };
+
+    fn simplify_config() -> RawWallToolPathConfig {
+        let scale = CoordinateScale::Normal;
+        RawWallToolPathConfig {
+            outer_spacing: 0,
+            inner_spacing: 0,
+            inset_count: 1,
+            outer_wall_inset: 0,
+            layer_height: 0,
+            min_bead_width: 0,
+            min_feature_size: 0,
+            transition_length: 0,
+            transitioning_angle: 0.0,
+            transition_filter_deviation: 0,
+            wall_distribution_count: 1,
+            min_length_factor: 0.5,
+            wall_maximum_resolution: scale.checked_scale(0.5).unwrap(),
+            wall_maximum_deviation: scale.checked_scale(0.025).unwrap(),
+            is_top_or_bottom_layer: false,
+            coordinate_scale: scale,
+        }
+    }
 
     fn odd_line(length: i64) -> ExtrusionLine {
         let mut line = ExtrusionLine::new(0, true);
@@ -152,7 +179,7 @@ mod tests {
         }
         let mut toolpaths = vec![vec![line]];
 
-        simplify_toolpaths(&mut toolpaths, CoordinateScale::Normal);
+        simplify_toolpaths(&mut toolpaths, simplify_config());
 
         assert_eq!(toolpaths[0][0].junctions.len(), 2);
         assert_eq!(toolpaths[0][0].junctions[0].point, Point::new(0, 0));

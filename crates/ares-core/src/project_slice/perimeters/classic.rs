@@ -38,7 +38,7 @@ pub(in crate::project_slice) use top_split::{
 pub(in crate::project_slice) use traversal::{
     PostClassicTraversalPrintObject, PreparedPostClassicTraversal,
 };
-pub(in crate::project_slice) use types::PreparedPostClassicPrelude;
+pub(in crate::project_slice) use types::{ClassicPreludeRecord, PreparedPostClassicPrelude};
 
 use crate::SliceError;
 

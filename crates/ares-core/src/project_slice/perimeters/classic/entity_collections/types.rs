@@ -39,9 +39,6 @@ pub(in crate::project_slice) struct ExtrusionEntityCollection {
 #[derive(Debug, PartialEq)]
 pub(in crate::project_slice) enum ExtrusionEntity {
     Loop(OrderedExtrusionLoop),
-    // Constructed only by the seam tests until arachne materialization
-    // (`PerimeterGenerator.cpp:553-566`) lands.
-    #[cfg_attr(not(test), allow(dead_code))]
     MultiPath(ExtrusionMultiPath),
 }
 
@@ -75,8 +72,7 @@ pub(in crate::project_slice) struct OrderedExtrusionLoop {
 /// thickness, extrusion height or bridging / non bridging (OrcaSlicer
 /// `ExtrusionEntity.hpp` `ExtrusionMultiPath`). Arachne's `traverse_extrusions`
 /// builds these from open wall lines whose per-junction widths clip into
-/// constant-width sub-paths (`PerimeterGenerator.cpp:553-566`); construction
-/// stays unwired until the arachne materialization seam.
+/// constant-width sub-paths (`PerimeterGenerator.cpp:553-566`).
 #[derive(Debug, PartialEq)]
 pub(in crate::project_slice) struct ExtrusionMultiPath {
     pub(in crate::project_slice) paths: Vec<ExtrusionPath>,

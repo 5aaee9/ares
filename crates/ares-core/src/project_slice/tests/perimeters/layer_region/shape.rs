@@ -24,7 +24,7 @@ fn task22o16_preserves_object_record_and_none_slot_order() {
             records: vec![Some(third), None],
         },
     ]
-    .map(materialize_object);
+    .map(|object| materialize_object(object, Vec::new()));
 
     assert_eq!(
         objects.map(|object| {

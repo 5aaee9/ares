@@ -1,0 +1,5 @@
+*.gcode -text whitespace=-blank-at-eol,-blank-at-eof
+*.3mf binary
+*.json -text
+*.stl -text
+prepare.mjs text eol=lf

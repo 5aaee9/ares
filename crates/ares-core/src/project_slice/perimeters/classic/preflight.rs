@@ -1,6 +1,6 @@
 use crate::{ObjectOptions, ProcessCounterboreHoleBridging, RegionOptions, SliceError};
 
-use super::super::types::{PerimeterDispatch, PerimeterInputRecord, PostPerimeterInputPrintObject};
+use super::super::types::{PerimeterInputRecord, PostPerimeterInputPrintObject};
 
 #[derive(Clone, Copy)]
 pub(super) struct ValidatedClassicConfig {
@@ -100,9 +100,6 @@ fn validate_record(
         nozzle_diameters,
         scale,
     } = context;
-    if record.dispatch == PerimeterDispatch::Arachne {
-        return Err(unsupported("wall_generator"));
-    }
     if region.detect_thin_wall.0
         && !thin_wall_is_provably_inactive(object, record, region, nozzle_diameters, scale)
     {

@@ -368,6 +368,8 @@ fn generate_with_mode(
         // Linux 2.4.2 artifacts retain the short standard-fill branch at the
         // common wall-path factor; ConcentricInternal retains all odd branches.
         min_length_factor: if standard { 0.5 } else { 0.0 },
+        wall_maximum_resolution: scale.checked_scale(0.5).unwrap(),
+        wall_maximum_deviation: scale.checked_scale(0.025).unwrap(),
         is_top_or_bottom_layer: false,
         coordinate_scale: scale,
     };

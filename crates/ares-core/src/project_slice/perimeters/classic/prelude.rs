@@ -11,7 +11,7 @@ use super::{
     types::{ClassicPreludeRecord, PreparedClassicSurface},
 };
 use crate::project_slice::perimeters::types::{
-    Flow, PerimeterInputRecord, PostPerimeterInputPrintObject,
+    Flow, PerimeterDispatch, PerimeterInputRecord, PostPerimeterInputPrintObject,
 };
 
 const INSET_OVERLAP_TOLERANCE: f64 = 0.4;
@@ -89,7 +89,6 @@ fn prepare_record(
     let smaller_external_lower_polygons_series =
         lower_series(lower, smaller_external_flow, nozzle_diameter, scale)?;
     let surfaces = prepare_surfaces(object, record, config)?;
-
     Ok(ClassicPreludeRecord {
         perimeter_width,
         perimeter_spacing,
@@ -116,6 +115,13 @@ fn prepare_surfaces(
     record: &PerimeterInputRecord,
     config: ValidatedClassicConfig,
 ) -> Result<Vec<PreparedClassicSurface>, SliceError> {
+    // Arachne records carry no classic surfaces: `process_arachne` owns
+    // their wall generation and materializes entities at the layer-region
+    // boundary. The classic chain still prepares their shared context
+    // (spacing, lower slices, staging inputs) from this record.
+    if record.dispatch == PerimeterDispatch::Arachne {
+        return Ok(Vec::new());
+    }
     let sources = object.current_surfaces(record);
     let geometry = sources
         .iter()

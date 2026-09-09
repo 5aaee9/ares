@@ -1,5 +1,6 @@
 mod outline;
 mod postprocess;
+pub(crate) mod region_order;
 mod stitch;
 
 use crate::geometry::{ClipperError, CoordinateScale, Polygon};
@@ -24,6 +25,8 @@ pub(crate) struct RawWallToolPathConfig {
     pub(crate) transition_filter_deviation: i64,
     pub(crate) wall_distribution_count: i32,
     pub(crate) min_length_factor: f64,
+    pub(crate) wall_maximum_resolution: i64,
+    pub(crate) wall_maximum_deviation: i64,
     pub(crate) is_top_or_bottom_layer: bool,
     pub(crate) coordinate_scale: CoordinateScale,
 }
@@ -117,7 +120,7 @@ pub(crate) fn generate(
         config.is_top_or_bottom_layer,
     );
     let inner_contour = postprocess::separate_inner_contour(&mut toolpaths);
-    postprocess::simplify_toolpaths(&mut toolpaths, config.coordinate_scale);
+    postprocess::simplify_toolpaths(&mut toolpaths, config);
     Ok(GeneratedWallToolPaths {
         toolpaths,
         inner_contour,
@@ -154,6 +157,8 @@ mod tests {
                 wall_distribution_count: 1,
                 coordinate_scale: scale,
                 min_length_factor: 0.5,
+                wall_maximum_resolution: scaled(0.5),
+                wall_maximum_deviation: scaled(0.025),
                 is_top_or_bottom_layer: false,
             },
         )

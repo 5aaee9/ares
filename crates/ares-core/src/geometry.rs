@@ -20,6 +20,7 @@ pub(crate) use bbox_clip::{
 pub(crate) use bounding_box::{BoundingBox, chain_expolygons, chain_expolygons_order};
 pub(crate) use bridge_direction::detect_bridging_direction;
 pub(crate) use chain_points::chain_points;
+pub(crate) use clipper::ClipOperation;
 #[cfg(test)]
 pub(in crate::geometry) use clipper::opening_path_configurations_for_test;
 #[cfg(test)]
@@ -27,6 +28,7 @@ pub(crate) use clipper::opening_paths_with_interstage;
 pub(crate) use clipper::ordering::{fixed_gcc_sort_by, fixed_msvc_sort_by};
 pub(crate) use clipper::raw_offset_paths;
 pub(crate) use clipper::union_contours;
+pub(crate) use clipper::z_clip::clip_open_path_widths;
 pub(crate) use clipper::{
     ClipperError, FillRule, JoinType, SAFETY_OFFSET, closing_ex, diff_pl, difference_ex,
     difference_ex_polygons, difference_ex_polygons_with_safety_offset,
