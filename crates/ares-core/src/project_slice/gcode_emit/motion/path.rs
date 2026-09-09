@@ -51,10 +51,21 @@ pub(super) fn emit(
     }
     let (acceleration, configured_speed) =
         properties.kinematics(&state.options, state.layer_index, source_length);
-    let original_speed = configured_speed.min(
-        state.options.max_volumetric_speed
-            / (properties.mm3_per_mm * state.options.filament_flow_ratio),
-    );
+    // `_mm3_per_mm` carries the effective flow (`GCode.cpp:6469-6471`:
+    // geometric mm3_per_mm scaled by print and filament flow ratios, with
+    // role ratios pre-baked into `PathProperties::mm3_per_mm`), and the cap
+    // only applies while `filament_max_volumetric_speed > 0`
+    // (`GCode.cpp:6615-6617`).
+    let original_speed = if state.options.max_volumetric_speed > 0.0 {
+        configured_speed.min(
+            state.options.max_volumetric_speed
+                / (properties.mm3_per_mm
+                    * state.options.print_flow_ratio
+                    * state.options.filament_flow_ratio),
+        )
+    } else {
+        configured_speed
+    };
     let processed = overhang::estimate(overhang::EstimateRequest {
         points: &local_points,
         properties,
