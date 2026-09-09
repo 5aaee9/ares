@@ -12,6 +12,7 @@ pub(super) struct Context<'a> {
     pub first_layer_bounds: Option<footprint::FirstLayerBounds>,
     pub start_position: Option<value::Value>,
     pub bed_cache: i32,
+    pub extruder_offset: (f64, f64),
     pub brim: &'a Option<brim::BrimPlan>,
     pub skirt: &'a Option<skirt::SkirtPlan>,
 }
@@ -27,6 +28,7 @@ pub(super) fn append(
         first_layer_bounds,
         start_position,
         bed_cache,
+        extruder_offset,
         brim,
         skirt,
     } = context;
@@ -105,6 +107,23 @@ pub(super) fn append(
     })();
     let fan_mover_handle = fan_mover_gate;
     for (object_index, object) in prepared.objects.iter_mut().enumerate() {
+        // Each print object extrudes around its own build-item placement:
+        // `bbs_3mf.cpp:3554-3560` applies per-instance transforms and
+        // `GCode.cpp:5380/5403/5437` calls `set_origin(unscale(
+        // instance.shift))` when a print object copy starts, so the
+        // emission origin switches with the object instead of keeping the
+        // first object's offset for the whole plate.
+        let (source_object_index, _) = traversal.objects[object_index]
+            .predecessor
+            .predecessor
+            .predecessor
+            .predecessor
+            .object
+            .identity();
+        if let Some((center_x, center_y)) = footprint::object_center(traversal, source_object_index)
+        {
+            state.offset = (center_x - extruder_offset.0, center_y - extruder_offset.1);
+        }
         let labels = object::ObjectLabels::from_traversal(traversal, object_index);
         let object_layer_count = object.len();
         let mut precise_layer_z = 0.0;

@@ -1,17 +1,13 @@
-use super::super::{
-    island_print_order::OrderedExtrusionLayer,
-    perimeters::classic::traversal::PreparedPostClassicTraversal,
-};
+use super::super::perimeters::classic::traversal::PreparedPostClassicTraversal;
 use crate::GenerationMetadata;
 
 pub(super) fn append_header(
     output: &mut Vec<u8>,
     metadata: GenerationMetadata,
-    objects: &[Vec<OrderedExtrusionLayer>],
     traversal: &PreparedPostClassicTraversal,
 ) {
     let (year, month, day, hour, minute, second) = metadata.timestamp();
-    let layers = objects.iter().map(Vec::len).max().unwrap_or(0);
+    let layers = plate_layer_count(traversal);
     let label_id = traversal
         .project
         .objects()
@@ -72,12 +68,40 @@ pub(super) fn append_header(
     output.extend_from_slice(b"; HEADER_BLOCK_END\n\n");
 }
 
-pub(super) fn finalize_layer_count(output: &mut Vec<u8>, tags: super::tags::Tags) -> usize {
-    let marker = format!("{}\n", tags.layer_change());
-    let layers = output
-        .windows(marker.len())
-        .filter(|window| *window == marker.as_bytes())
-        .count();
+/// `GCode.cpp:2513-2527` (default print sequence): the plate layer count
+/// merges every print object's layer print_z values into one sorted unique
+/// set, rather than summing per-object layer counts.
+pub(super) fn plate_layer_count(traversal: &PreparedPostClassicTraversal) -> usize {
+    let mut zs = Vec::new();
+    for object in &traversal.objects {
+        let (post_region, _) = object
+            .predecessor
+            .predecessor
+            .predecessor
+            .predecessor
+            .object
+            .object
+            .as_parts();
+        let (plan, _, _) = post_region.as_parts();
+        zs.extend(plan.layers.iter().map(|layer| layer.print_z));
+    }
+    zs.sort_by(f64::total_cmp);
+    let mut count = 0;
+    let mut previous: Option<f64> = None;
+    for z in zs {
+        if previous.is_none_or(|previous| (z - previous).abs() >= EPSILON) {
+            count += 1;
+            previous = Some(z);
+        }
+    }
+    count
+}
+
+/// `libslic3r` `EPSILON` used by `GCode.cpp:2523` to merge numerically
+/// close layer print_z values.
+const EPSILON: f64 = 1e-4;
+
+pub(super) fn finalize_layer_count(output: &mut Vec<u8>, layers: usize) -> usize {
     let prefix = b"; total layer number: ";
     let start = output
         .windows(prefix.len())
@@ -102,6 +126,18 @@ fn format_values(values: &[crate::OrcaFloat]) -> String {
 }
 
 pub(super) fn append_width_block(output: &mut Vec<u8>, traversal: &PreparedPostClassicTraversal) {
+    // `GCode.cpp:2676-2693`: one terse width block per print region, in
+    // region order (one region per object model part here).
+    for object in &traversal.resolved.objects {
+        append_object_width_block(output, traversal, object);
+    }
+}
+
+fn append_object_width_block(
+    output: &mut Vec<u8>,
+    traversal: &PreparedPostClassicTraversal,
+    object: &crate::project::effective_config::types::ResolvedProjectObject,
+) {
     let settings = &traversal.resolved.views.full;
     let nozzle = settings
         .project
@@ -110,11 +146,6 @@ pub(super) fn append_width_block(output: &mut Vec<u8>, traversal: &PreparedPostC
         .0
         .first()
         .map_or(0.4, |value| value.0);
-    let object = traversal
-        .resolved
-        .objects
-        .first()
-        .expect("validated project has a resolved object");
     let object_options = &object.object;
     let region = object
         .layer_candidates

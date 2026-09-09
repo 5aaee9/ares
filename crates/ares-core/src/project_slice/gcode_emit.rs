@@ -52,7 +52,7 @@ pub(super) fn emit(
     let mut output = Vec::new();
     file_start::append(&mut output, traversal, metadata, first_layer_bounds)?;
     let tags = tags::Tags::of(traversal);
-    header::append_header(&mut output, metadata, &prepared.objects, traversal);
+    header::append_header(&mut output, metadata, traversal);
     // `GCode.cpp` + Orca export layout: BBL keeps the config block up front;
     // the compatible flavor moves it after the tail statistics.
     if tags.is_bbl()
@@ -106,6 +106,7 @@ pub(super) fn emit(
             first_layer_bounds,
             start_position,
             bed_cache,
+            extruder_offset,
             brim: &brim,
             skirt: &skirt,
         },
@@ -119,7 +120,8 @@ pub(super) fn emit(
         .predecessor
         .predecessor;
     let fan_layers_end = output.len();
-    let emitted_layer_count = header::finalize_layer_count(&mut output, tags);
+    let emitted_layer_count =
+        header::finalize_layer_count(&mut output, header::plate_layer_count(traversal));
     // The final compatible layer has no following layer marker to flush its
     // deferred retraction. Flush only retract/wipe (not a travel lift) before
     // end G-code (`GCode.cpp` final object teardown).
