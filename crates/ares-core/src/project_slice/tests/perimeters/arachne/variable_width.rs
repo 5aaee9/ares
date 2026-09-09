@@ -129,6 +129,22 @@ fn width_step_beyond_the_merge_tolerance_starts_a_new_path() {
 }
 
 #[test]
+fn unscaled_junction_width_matches_upstream_f32_multiply() {
+    // `unscale<float>(w)` is `T(v) * T(SCALING_FACTOR)` with `T = float`
+    // (`libslic3r.h:124-125`), so `VariableWidth.cpp:66` multiplies in f32;
+    // an f64-intermediate multiply lands 1 ulp away on ~3% of scaled
+    // widths (e.g. 150036) and diverges from the reference G-code. The
+    // value is chosen to distinguish the two paths.
+    let paths = convert(&[(0, 0, 150_036), (1_000_000, 0, 150_036)]);
+    assert_eq!(paths.len(), 1);
+    let upstream = 150_036_f32 * SCALE.factor() as f32 + 0.2 * ROUNDED_RECTANGLE_FACTOR;
+    let f64_intermediate =
+        ((150_036.0_f64 * SCALE.factor()) as f32) + 0.2 * ROUNDED_RECTANGLE_FACTOR;
+    assert_ne!(f64_intermediate, upstream);
+    assert_eq!(paths[0].width, upstream);
+}
+
+#[test]
 fn tiny_line_splices_into_the_current_path_endpoint() {
     // The middle junction duplicates its predecessor, so the middle thick line
     // is shorter than `SCALED_EPSILON` and splices into the running path
