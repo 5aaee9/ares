@@ -211,7 +211,11 @@ pub(in crate::project_slice) fn surface_infill_boundary(
     } else {
         overlaps.infill_wall_overlap / 100.0
     };
-    let inset = overlap_factor * base_inset as f64;
+    // `coord_t(scale_(...get_abs_value(...)))` (`PerimeterGenerator.cpp:2492-2501`):
+    // the overlap percentage product truncates to the integer domain before it
+    // feeds the offset delta, keeping `inset + min/2` on upstream's rounding
+    // grid.
+    let inset = (overlap_factor * base_inset as f64) as i64;
     // Simplify infill contours and collapse narrow areas
     // (`PerimeterGenerator.cpp:2495-2502`).
     let mut polygons = Vec::new();
@@ -221,12 +225,16 @@ pub(in crate::project_slice) fn surface_infill_boundary(
         );
     }
     let not_filled = union_ex(&polygons, FillRule::NonZero).map_err(geometry_error)?;
+    // `coord_t(solid_infill_spacing * (1. - INSET_OVERLAP_TOLERANCE))`
+    // (`PerimeterGenerator.cpp:2506`): the truncation to the integer domain
+    // before the halving keeps the downstream offset deltas on upstream's
+    // half-integer rounding boundary (e.g. 125561/2 = 62780.5).
     let min_perimeter_infill_spacing =
-        spacings.solid_infill_spacing as f64 * (1.0 - INSET_OVERLAP_TOLERANCE);
+        (spacings.solid_infill_spacing as f64 * (1.0 - INSET_OVERLAP_TOLERANCE)) as i64;
     let fill_surfaces = offset2_ex(
         &not_filled,
-        (-min_perimeter_infill_spacing / 2.0) as f32,
-        (inset + min_perimeter_infill_spacing / 2.0) as f32,
+        (-(min_perimeter_infill_spacing as f64) / 2.0) as f32,
+        ((inset as f64) + (min_perimeter_infill_spacing as f64) / 2.0) as f32,
         JoinType::Miter,
         MITER_LIMIT,
     )
@@ -234,8 +242,8 @@ pub(in crate::project_slice) fn surface_infill_boundary(
     // BBS no-overlap infill expolygons (`PerimeterGenerator.cpp:2522-2531`).
     let fill_no_overlap = offset2_ex(
         &not_filled,
-        (-min_perimeter_infill_spacing / 2.0) as f32,
-        (min_perimeter_infill_spacing / 2.0) as f32,
+        (-(min_perimeter_infill_spacing as f64) / 2.0) as f32,
+        ((min_perimeter_infill_spacing as f64) / 2.0) as f32,
         JoinType::Miter,
         MITER_LIMIT,
     )

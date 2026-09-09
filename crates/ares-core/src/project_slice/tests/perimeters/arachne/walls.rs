@@ -167,3 +167,76 @@ fn task22w16_infill_boundary_applies_the_wall_overlap_percent() {
     assert!(!boundary.fill_surfaces.is_empty());
     assert!(!boundary.fill_no_overlap.is_empty());
 }
+
+#[test]
+fn task22w17_infill_boundary_truncates_offsets_before_halving() {
+    // case-w4hWv8 layer 2 (Anker M5 0.2 nozzle, exact 10 mm cube): the arachne
+    // inner contour of the wall call is the exact square [±4361464]^2 and
+    // `solid_infill_spacing` is 209269. Upstream computes
+    // `coord_t(209269 * 0.6) = 125561` (`PerimeterGenerator.cpp:2506`) and
+    // `coord_t(scale_(0.15 * 209269)) = 31390` for the overlap inset
+    // (`PerimeterGenerator.cpp:2492-2501`) before halving, so the offset2
+    // deltas land on the half-integer ClipperLib rounding boundary
+    // (floor(x + 0.5)). Skipping either truncation moves the no-overlap square
+    // by one scaled unit per side and flips the concentric corner incenter
+    // rounding, changing the wall-B width from 0.264891 to 0.26489.
+    let inner_contour = vec![ExPolygon::new(
+        Polygon::new(vec![
+            Point::new(4361464, 4361464),
+            Point::new(-4361464, 4361464),
+            Point::new(-4361464, -4361464),
+            Point::new(4361464, -4361464),
+        ]),
+        Vec::new(),
+    )];
+    let spacings = ArachneSpacings {
+        perimeter_spacing: 209269,
+        ext_perimeter_width: 220000,
+        ext_perimeter_spacing: 209269,
+        ext_perimeter_spacing2: 209269,
+        solid_infill_spacing: 209269,
+    };
+    let boundary = crate::project_slice::perimeters::arachne::walls::surface_infill_boundary(
+        inner_contour,
+        3,
+        2,
+        &spacings,
+        12500.0,
+        InfillOverlapPercents {
+            infill_wall_overlap: 15.0,
+            top_bottom_infill_wall_overlap: 15.0,
+        },
+        false,
+    )
+    .unwrap();
+
+    let corners = |expolygons: &[ExPolygon]| -> Vec<(i64, i64)> {
+        let mut points = expolygons
+            .iter()
+            .flat_map(|expolygon| expolygon.contour().points().iter())
+            .map(|point| (point.x(), point.y()))
+            .collect::<Vec<_>>();
+        points.sort_unstable();
+        points
+    };
+    // offset2(-62780.5, +62780.5) rounds each side half-up: [−4361463, 4361465]^2.
+    assert_eq!(
+        corners(&boundary.fill_no_overlap),
+        vec![
+            (-4361463, -4361463),
+            (-4361463, 4361465),
+            (4361465, -4361463),
+            (4361465, 4361465),
+        ]
+    );
+    // offset2(-62780.5, 31390 + 62780.5): [−4392853, 4392855]^2.
+    assert_eq!(
+        corners(&boundary.fill_surfaces),
+        vec![
+            (-4392853, -4392853),
+            (-4392853, 4392855),
+            (4392855, -4392853),
+            (4392855, 4392855),
+        ]
+    );
+}
