@@ -5,7 +5,8 @@ mod trapezoidation;
 pub(crate) mod wall_toolpaths;
 
 #[cfg(test)]
-pub(crate) use extrusion_line::{ExtrusionJunction, ExtrusionLine};
+pub(crate) use extrusion_line::ExtrusionJunction;
+pub(crate) use extrusion_line::ExtrusionLine;
 
 #[cfg(test)]
 mod tests;

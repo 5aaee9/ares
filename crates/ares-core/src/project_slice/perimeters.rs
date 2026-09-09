@@ -7,6 +7,7 @@ use super::ProjectBytes;
 use super::compensation::{PreparedPostCompensation, prepare_post_compensation};
 use context::prepare_perimeter_contexts;
 
+pub(super) mod arachne;
 pub(super) mod classic;
 pub(super) mod layer_region;
 use preflight::preflight_perimeter_flows;

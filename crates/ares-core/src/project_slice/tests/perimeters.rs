@@ -1,3 +1,4 @@
+mod arachne;
 mod classic;
 mod context;
 mod fixture;

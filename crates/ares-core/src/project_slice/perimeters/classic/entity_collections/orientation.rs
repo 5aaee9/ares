@@ -2,7 +2,7 @@ use crate::ProcessWallDirection;
 
 use super::super::chained_loops::ExtrusionLoop;
 
-pub(super) fn orient_loop(
+pub(in crate::project_slice) fn orient_loop(
     loop_: &mut ExtrusionLoop,
     wall_direction: ProcessWallDirection,
     is_contour: bool,
@@ -19,14 +19,14 @@ pub(super) fn orient_loop(
     }
 }
 
-pub(super) fn reverse_loop(loop_: &mut ExtrusionLoop) {
+pub(in crate::project_slice) fn reverse_loop(loop_: &mut ExtrusionLoop) {
     for path in &mut loop_.paths {
         path.reverse();
     }
     loop_.paths.reverse();
 }
 
-pub(super) fn is_counter_clockwise(loop_: &ExtrusionLoop) -> bool {
+pub(in crate::project_slice) fn is_counter_clockwise(loop_: &ExtrusionLoop) -> bool {
     let mut last = None;
     for path in loop_.paths.iter().rev() {
         if path.polyline.points.len() > 1 {

@@ -7,6 +7,7 @@ mod tests;
 mod traverse;
 mod types;
 
+pub(in crate::project_slice) use orientation::orient_loop;
 pub(in crate::project_slice) use types::{
     ExtrusionEntity, ExtrusionEntityCollection, PreparedEntityCollectionObject,
     PreparedEntityCollectionRecord, PreparedEntityCollectionSurface,
