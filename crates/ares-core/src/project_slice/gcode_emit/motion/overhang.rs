@@ -51,15 +51,24 @@ pub(super) fn estimate(request: EstimateRequest<'_>) -> Option<Vec<ProcessedPoin
         return None;
     }
 
-    let reference_speed = if matches!(request.properties.feature, "Outer wall" | "Overhang wall") {
+    // The reference speed caps against the same effective `_mm3_per_mm` as
+    // the extrusion speed cap (`GCode.cpp:6658-6665`), and only while
+    // `filament_max_volumetric_speed > 0`.
+    let role_speed = if matches!(request.properties.feature, "Outer wall" | "Overhang wall") {
         request.options.outer_wall_speed
     } else {
         request.options.inner_wall_speed
-    }
-    .min(
-        request.options.max_volumetric_speed
-            / (request.properties.mm3_per_mm * request.options.filament_flow_ratio),
-    );
+    };
+    let reference_speed = if request.options.max_volumetric_speed > 0.0 {
+        role_speed.min(
+            request.options.max_volumetric_speed
+                / (request.properties.mm3_per_mm
+                    * request.options.print_flow_ratio
+                    * request.options.filament_flow_ratio),
+        )
+    } else {
+        role_speed
+    };
     let reference_speed = request
         .properties
         .slope
