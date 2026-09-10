@@ -240,14 +240,22 @@ impl SkirtPlan {
             )
         };
         for loop_points in loops {
-            let split = split_at_nearest(loop_points, seam_target);
-            motion::emit_skirt_loop(
-                output,
-                split.into_iter().map(|point| (point.x(), point.y())),
-                flow,
-                geometry,
-                state,
+            // Upstream splits the plate-frame loop directly (`GCode::generate_skirt`
+            // `set_origin(unscale(Point(0,0)))`, `GCode.cpp:4424`): projection
+            // feet truncate in plate coordinates. Split there and restore.
+            let offset = (
+                (state.offset.0 / geometry.scale.factor()).round() as i64,
+                (state.offset.1 / geometry.scale.factor()).round() as i64,
             );
+            let plate = loop_points
+                .iter()
+                .map(|point| Point::new(point.x() + offset.0, point.y() + offset.1))
+                .collect::<Vec<_>>();
+            let plate_target = Point::new(seam_target.x() + offset.0, seam_target.y() + offset.1);
+            let split = split_at_nearest(&plate, plate_target)
+                .into_iter()
+                .map(|point| (point.x() - offset.0, point.y() - offset.1));
+            motion::emit_skirt_loop(output, split, flow, geometry, state);
             if let Some(last) = state.last_scaled_position {
                 seam_target = Point::new(last.0, last.1);
             }
