@@ -33,10 +33,27 @@ pub(super) fn emit(
             (dx * dx + dy * dy).sqrt() * geometry.scale.factor()
         })
         .sum();
+    // Upstream clips every loop tail in the origin-shifted (plate) frame
+    // (`set_origin(unscaled(offset))`, `GCode.cpp:4424`): the truncating
+    // cast inside `clip_end` rounds opposite directions for negative local
+    // coordinates, shifting interpolated endpoints by one lattice unit.
+    // Shift into the plate frame for the clip and restore after.
+    let plate_offset = (
+        (state.offset.0 / geometry.scale.factor()).round() as i64,
+        (state.offset.1 / geometry.scale.factor()).round() as i64,
+    );
+    for point in &mut scaled_points {
+        point.0 += plate_offset.0;
+        point.1 += plate_offset.1;
+    }
     clip::clip_end(
         &mut scaled_points,
         properties.end_clip / geometry.scale.factor(),
     );
+    for point in &mut scaled_points {
+        point.0 -= plate_offset.0;
+        point.1 -= plate_offset.1;
+    }
     let Some((&first_scaled, &last_scaled)) = scaled_points.first().zip(scaled_points.last())
     else {
         return;

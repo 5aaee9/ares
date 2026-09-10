@@ -1,4 +1,4 @@
-pub(super) fn clip_end(points: &mut Vec<(i64, i64)>, distance: f64) {
+pub(in crate::project_slice::gcode_emit) fn clip_end(points: &mut Vec<(i64, i64)>, distance: f64) {
     if distance <= 0.0 {
         return;
     }

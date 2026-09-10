@@ -1,6 +1,6 @@
 mod acceleration;
 mod arc;
-mod clip;
+pub(super) mod clip;
 mod extrusion;
 mod fan;
 mod features;
@@ -159,7 +159,8 @@ pub(super) fn emit_skirt_loop(
             feature: "Skirt",
             is_perimeter: false,
             // `GCode::extrude_loop` clips every loop by the seam gap
-            // (`GCode.cpp:5778-5790`).
+            // (`GCode.cpp:5778-5790`); `path::emit` clips in the plate
+            // frame to match upstream's origin-shifted coordinates.
             end_clip: state.options.seam_gap,
             fitting: &[],
             slope: None,
