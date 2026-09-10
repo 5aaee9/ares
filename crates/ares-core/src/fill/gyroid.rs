@@ -78,12 +78,17 @@ fn fill_component(
     let density =
         (f64::from(params.density) * DENSITY_ADJUST / f64::from(params.multiline)).max(0.0);
     let distance = (params.spacing / scale.factor() / density) as i64;
-    let period = (2.0 * std::f64::consts::PI * distance as f64) as i64;
+    // Upstream: `bb.merge(align_to_grid(bb.min, Point(2*M_PI*distance,
+    // 2*M_PI*distance)))` — the `Point(double, double)` ctor applies
+    // `std::round` (`Point.hpp:197`), not truncation.
+    let period = (2.0 * std::f64::consts::PI * distance as f64).round() as i64;
     minimum = Point::new(
         minimum.x().div_euclid(period) * period,
         minimum.y().div_euclid(period) * period,
     );
-    let expand = (10.0 * params.spacing / scale.factor()) as i64;
+    // Upstream: `coord_t expand = 10 * (scale_(this->spacing))` — scale
+    // first, then multiply, then truncate (FillGyroid.cpp:309).
+    let expand = (10.0 * (params.spacing / scale.factor())) as i64;
     minimum = Point::new(
         minimum
             .x()
