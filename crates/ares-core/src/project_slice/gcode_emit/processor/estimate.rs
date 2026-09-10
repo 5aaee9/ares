@@ -201,11 +201,14 @@ impl Estimate {
                 elapsed[index + 1] = Some(cache[cache_index].1);
             }
         }
+        // `prepare_time += block_time` accumulates in f32
+        // (`GCodeProcessor.cpp:475-476`), so the exported trailer matches
+        // upstream's float rounding at the sixth decimal.
         let prepare = times
             .iter()
             .zip(prepare_stages)
             .filter_map(|(time, is_prepare)| is_prepare.then_some(time))
-            .sum();
+            .fold(0.0_f32, |sum, time| sum + *time as f32) as f64;
         Self {
             total: cumulative + trailing_delay,
             prepare,

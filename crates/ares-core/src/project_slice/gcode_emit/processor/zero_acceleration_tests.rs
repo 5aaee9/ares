@@ -24,7 +24,7 @@ fn zero_acceleration_linear_move_has_one_second_total_and_complete_output() {
     assert_eq!(estimate.total, 1.0);
     assert_eq!(
         process(input.as_bytes().to_vec(), true, 0.0, 0.0, zero_z_limits()),
-        b"M73 P0 R0\nG1 Z10 F600\nM73 P100 R0\n; estimated printing time (normal mode) = 1s\n"
+        b"M73 P0 R0\nG1 Z10 F600\nM73 P100 R0\n; estimated printing time (normal mode) = 1.000000s\n"
     );
 }
 

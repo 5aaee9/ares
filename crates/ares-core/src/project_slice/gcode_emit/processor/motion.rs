@@ -2,7 +2,7 @@ mod arc;
 #[cfg(test)]
 mod axis_acceleration_tests;
 mod limits;
-use super::motion_util::{assignment, clamp, clamped_word, norm, scale, word};
+use super::motion_util::{MMMIN_TO_MMSEC, assignment, clamp, clamped_word, norm, scale, word};
 use crate::options::GCodeFlavor;
 mod planner;
 pub(super) use planner::RollingPlanner;
@@ -234,7 +234,7 @@ impl MotionState {
             return None;
         }
         if let Some(value) = word(code, 'F') {
-            self.feedrate = value / 60.0;
+            self.feedrate = f64::from(value as f32 * MMMIN_TO_MMSEC);
         }
         let old = self.position;
         let mut next = old;

@@ -30,16 +30,29 @@ pub(super) fn arc_internal_g1_lines(code: &str, command: &str, state: &MotionSta
     });
     let rel_start = (-i, -j);
     let rel_end = (end_x - (start[0] + i), end_y - (start[1] + j));
-    let mut angle = (rel_start.0 * rel_end.1 - rel_start.1 * rel_end.0)
-        .atan2(rel_start.0 * rel_end.0 + rel_start.1 * rel_end.1);
-    if angle < 0.0 {
-        angle += std::f64::consts::TAU;
-    }
-    if command == "G2" {
-        angle -= std::f64::consts::TAU;
-    }
+    // `is_full_circle()` pins the sweep to a full turn before the clockwise
+    // adjustment (`GCodeProcessor.cpp:4660-4669`).
+    let full_circle = (end_x - start[0]).abs() < 1.0e-4 && (end_y - start[1]).abs() < 1.0e-4;
+    let angle = if full_circle {
+        std::f64::consts::TAU
+    } else {
+        let angle = (rel_start.0 * rel_end.1 - rel_start.1 * rel_end.0)
+            .atan2(rel_start.0 * rel_end.0 + rel_start.1 * rel_end.1);
+        let angle = if angle < 0.0 {
+            angle + std::f64::consts::TAU
+        } else {
+            angle
+        };
+        if command == "G2" {
+            angle - std::f64::consts::TAU
+        } else {
+            angle
+        }
+    };
     let angle = angle.abs().min(std::f64::consts::TAU);
-    let feedrate_mm_s = word(code, 'F').map_or(state.feedrate, |value| value / 60.0) as f32;
+    let feedrate_mm_s = word(code, 'F').map_or(state.feedrate, |value| {
+        f64::from(value as f32 * super::motion_util::MMMIN_TO_MMSEC)
+    }) as f32;
     let segments = if state.gcode_flavor == crate::GCodeFlavor::MarlinFirmware {
         const MAX_ARC_DEVIATION: f32 = 0.02;
         const MIN_ARC_SEGMENTS_PER_SEC: f32 = 50.0;

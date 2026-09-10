@@ -179,7 +179,7 @@ fn collinear_cruise_time_is_not_zeroed_by_default_jerk() {
 
     let times = planned_times(&[first, second]);
 
-    assert!((times.iter().sum::<f64>() - 20.043351).abs() < 1e-6);
+    assert!((times.iter().sum::<f64>() - 20.043_349_266_052_246).abs() < 1e-6);
 }
 
 #[test]
@@ -318,7 +318,7 @@ fn single_block_synchronization_waits_for_next_motion() {
     let estimate = Estimate::from_lines(&lines, 0.0, nonbinding_axis_limits());
 
     assert!(
-        (estimate.total - 20.043351).abs() < 1e-6,
+        (estimate.total - 20.043_349_266_052_246).abs() < 1e-6,
         "{}",
         estimate.total
     );
@@ -386,7 +386,9 @@ fn unsupported_commands_do_not_change_motion_feedrate() {
 
     let block = state.motion("G1 X2").unwrap();
 
-    assert_eq!(block.speed, 10.0);
+    // F600 through the f32 reciprocal lands at 10.000001 mm/s
+    // (`GCodeProcessor.cpp:41`).
+    assert_eq!(block.speed, 10.000_000_953_674_316);
 }
 #[test]
 fn arc_p_word_adds_full_turns() {
@@ -423,4 +425,55 @@ fn progress_skips_e_only_retract_lines() {
     // the only M73 after Z.8 is the final P100 placeholder, so no emission
     // carries the retract's own cumulative time
     assert!(output.ends_with("G1 Z.8 F600\nM73 P100 R0\n"), "{output}");
+}
+
+// `get_time_dhms` prints sub-second times with the `%f` format
+// (`Utils.hpp:540-560`): values at or below one second keep six fractional
+// digits instead of truncating to `0s`.
+#[test]
+fn first_layer_time_trailer_prints_fractional_seconds() {
+    let output = b"; estimated printing time (normal mode) = 0s\n; estimated first layer printing time (normal mode) = 0s\nM73 P0 R0\n;TYPE:Custom\nG1 X5 F600\n;TYPE:Inner wall\nG1 X1000 F600\nM73 P100 R0\n".to_vec();
+
+    let output =
+        String::from_utf8(process(output, true, 0.0, 0.0, nonbinding_axis_limits())).unwrap();
+
+    assert!(
+        output.contains("; estimated first layer printing time (normal mode) = 0.500040s"),
+        "{output}"
+    );
+}
+
+// A full-circle arc (`is_full_circle`, `GCodeProcessor.cpp:4660-4669`) pins the
+// sweep to a full turn before the clockwise adjustment, so the ArcWelder
+// discretization consumes one g1 line id per segment.
+#[test]
+fn full_circle_arc_consumes_discretized_g1_line_ids() {
+    use super::arc_accounting::arc_internal_g1_lines;
+    use super::motion::MotionState;
+    let state = MotionState {
+        position: [0.0, 0.0, 0.0],
+        ..MotionState::default()
+    };
+    let internal = arc_internal_g1_lines("G3 Z.5 I5 J0 P1 F600", "G3", &state);
+    assert_eq!(internal, 44, "radius 5 full circle at 0.0125 tolerance");
+}
+
+// `fast_float::from_chars` rejects a leading `+` (`GCodeReader.cpp:276-288`),
+// so `Z+0.5` words carry no axis value at all.
+#[test]
+fn leading_plus_word_carries_no_value() {
+    let mut state = MotionState::default();
+    let blocks = state.motions("G1 X+10 F600");
+    assert!(blocks.is_empty());
+    assert_eq!(state.position, [0.0, 0.0, 0.0]);
+}
+
+// `m_feedrate = line.f() * MMMIN_TO_MMSEC` multiplies by the f32 reciprocal
+// (`GCodeProcessor.cpp:41`), so F21000 lands at 350.000031 mm/s, not 350.0.
+#[test]
+fn feedrate_converts_through_f32_reciprocal() {
+    use super::motion::MotionState;
+    let mut state = MotionState::default();
+    let _ = state.motions("G1 F21000");
+    assert_eq!(state.feedrate, 350.000_030_517_578_1);
 }
