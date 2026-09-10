@@ -62,8 +62,18 @@ fn fill_component(
     params: GyroidFillParams,
     scale: CoordinateScale,
 ) -> Result<Vec<Polyline>, ClipperError> {
-    let infill_angle = f64::from(params.angle) + CORRECTION_ANGLE;
-    let rotated = rotate_expolygon(surface, -infill_angle)?;
+    // Upstream computes `float(angle + CorrectionAngle)` and skips both
+    // rotations when `|infill_angle| < EPSILON` (FillGyroid.cpp:294-297,
+    // 369-371); rotating by a near-zero residual shifts large plate
+    // coordinates past integer rounding boundaries.
+    let infill_angle = (f64::from(params.angle) + CORRECTION_ANGLE) as f32;
+    let infill_angle = f64::from(infill_angle);
+    let rotate = infill_angle.abs() >= EPSILON;
+    let rotated = if rotate {
+        rotate_expolygon(surface, -infill_angle)?
+    } else {
+        surface.clone()
+    };
     let (mut minimum, mut maximum) = contour_bounds(rotated.contour());
     let density =
         (f64::from(params.density) * DENSITY_ADJUST / f64::from(params.multiline)).max(0.0);
@@ -128,7 +138,9 @@ fn fill_component(
         },
         scale,
     )?;
-    rotate_polylines(&mut connected, infill_angle)?;
+    if rotate {
+        rotate_polylines(&mut connected, infill_angle)?;
+    }
     Ok(connected)
 }
 
