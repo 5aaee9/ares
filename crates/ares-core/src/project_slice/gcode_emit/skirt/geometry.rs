@@ -59,19 +59,23 @@ pub(super) fn find_start_point(points: &[Point], start_angle_deg: f64) -> Point 
             max_y = y;
         }
     }
-    // `Point center((min + max) / 2.)` truncates the half-unit center before
-    // `distance_to` computes the radius.
+    // `Point center((min + max) / 2.)` constructs Point from doubles —
+    // the `Point(double, double)` ctor applies `std::round` (half away from
+    // zero), not truncation (`Point.hpp:197`). The same rounding applies to
+    // the returned angle target.
     let center = Point::new(
-        ((min_x + max_x) as f64 / 2.0) as i64,
-        ((min_y + max_y) as f64 / 2.0) as i64,
+        ((min_x + max_x) as f64 / 2.0).round() as i64,
+        ((min_y + max_y) as f64 / 2.0).round() as i64,
     );
     let center_x = center.x() as f64;
     let center_y = center.y() as f64;
     let radius = ((center_x - min_x as f64).powi(2) + (center_y - min_y as f64).powi(2)).sqrt();
-    let radians = start_angle_deg.to_radians();
+    // Upstream: `deg = start_angle * PI / 180` (multiply, then divide) —
+    // not `to_radians()`'s single multiply by the precomputed constant.
+    let radians = start_angle_deg * std::f64::consts::PI / 180.0;
     Point::new(
-        (center_x + radius * radians.cos()) as i64,
-        (center_y + radius * radians.sin()) as i64,
+        (center_x + radius * radians.cos()).round() as i64,
+        (center_y + radius * radians.sin()).round() as i64,
     )
 }
 
@@ -121,6 +125,9 @@ fn projection_onto(a: Point, b: Point, point: Point) -> Point {
     }
     let lx = (b.x() - a.x()) as f64;
     let ly = (b.y() - a.y()) as f64;
+    // Disassembly of the AppImage `Point::projection_onto(Line)` confirms
+    // GCC emits plain `mulsd`/`addsd`/`divsd` here — no FMA contraction —
+    // and `cvttsd2si` truncation for the interpolated point.
     let theta =
         ((b.x() - point.x()) as f64 * lx + (b.y() - point.y()) as f64 * ly) / (lx * lx + ly * ly);
     if (0.0..=1.0).contains(&theta) {

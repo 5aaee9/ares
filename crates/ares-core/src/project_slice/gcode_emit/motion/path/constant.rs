@@ -10,6 +10,7 @@ pub(super) struct Emission<'a, 'b> {
     pub(super) output: &'a mut Vec<u8>,
     pub(super) points: &'a [(f64, f64)],
     pub(super) local_points: &'a [(f64, f64)],
+    pub(super) segment_lengths: &'a [f64],
     pub(super) fitting: &'a [FittedMove],
     pub(super) last_scaled: (i64, i64),
     pub(super) properties: PathProperties<'b>,
@@ -21,6 +22,7 @@ pub(super) fn emit(emission: Emission<'_, '_>) {
         output,
         points,
         local_points,
+        segment_lengths,
         fitting,
         last_scaled,
         properties,
@@ -46,14 +48,13 @@ pub(super) fn emit(emission: Emission<'_, '_>) {
     } else {
         points
             .windows(2)
-            .map(|pair| arc::Segment::Line {
+            .zip(segment_lengths.iter())
+            .map(|(pair, &length)| arc::Segment::Line {
                 end: arc::Point {
                     x: pair[1].0,
                     y: pair[1].1,
                 },
-                length: ((pair[1].0 - pair[0].0) * (pair[1].0 - pair[0].0)
-                    + (pair[1].1 - pair[0].1) * (pair[1].1 - pair[0].1))
-                    .sqrt(),
+                length,
             })
             .collect()
     };

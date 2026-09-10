@@ -41,6 +41,18 @@ pub(super) fn emit(
     else {
         return;
     };
+    // Upstream computes segment lengths from scaled integer coordinates
+    // (`Line::length() * SCALING_FACTOR`, `GCode.cpp:6997-6998`), not from
+    // the unscaled mm coordinates. Computing from mm loses precision through
+    // the double rounding of `unscale` before the distance.
+    let segment_lengths = scaled_points
+        .windows(2)
+        .map(|pair| {
+            let dx = (pair[1].0 - pair[0].0) as f64;
+            let dy = (pair[1].1 - pair[0].1) as f64;
+            (dx * dx + dy * dy).sqrt() * geometry.scale.factor()
+        })
+        .collect::<Vec<_>>();
     let mut local_points = scaled_points
         .into_iter()
         .map(|(x, y)| (geometry.scale.unscale(x), geometry.scale.unscale(y)))
@@ -209,6 +221,7 @@ pub(super) fn emit(
         output,
         points: &points,
         local_points: &local_points,
+        segment_lengths: &segment_lengths,
         fitting: &fitting,
         last_scaled,
         properties,
