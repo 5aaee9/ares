@@ -141,12 +141,12 @@ pub(super) fn emit_brim_loop(
             .iter()
             .map(|&(x, y)| Point::new(x + offset.0, y + offset.1))
             .collect::<Vec<_>>();
-        let split = super::skirt::split_at_nearest(&plate, plate_target)
-            .into_iter()
-            .map(|point| (point.x() - offset.0, point.y() - offset.1));
+        let split = super::skirt::split_at_nearest(&plate, plate_target);
         path::emit(
             output,
-            split,
+            split
+                .iter()
+                .map(|point| (point.x() - offset.0, point.y() - offset.1)),
             PathProperties {
                 mm3_per_mm: flow.mm3_per_mm,
                 width: flow.width,
@@ -160,6 +160,17 @@ pub(super) fn emit_brim_loop(
             geometry,
             state,
         );
+        // `extrude_loop`'s wipe storage (GCode.cpp:5979-5991) concatenates
+        // the loop's paths FORWARD (no reverse) — the brim retract's wipe
+        // walks the ring from the seam. `path::emit` stored the reversed
+        // per-path list; overwrite with the pre-clip split in order.
+        state.wipe_path = split
+            .iter()
+            .map(|point| arc::Point {
+                x: geometry.scale.unscale(point.x() - offset.0) + state.offset.0,
+                y: geometry.scale.unscale(point.y() - offset.1) + state.offset.1,
+            })
+            .collect::<Vec<_>>();
         return;
     }
     path::emit(
