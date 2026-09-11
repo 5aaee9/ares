@@ -1,5 +1,6 @@
 //! `GCodeProcessor` axis limits, junction deviation and logical position.
 
+use super::super::motion_util::MMMIN_TO_MMSEC;
 use super::{GCodeFlavor, MotionState, word};
 
 impl MotionState {
@@ -49,14 +50,44 @@ impl MotionState {
         jerk
     }
 
+    /// `GCodeProcessor.cpp:5160-5201` (M201) and `:5179-5201` (M203):
+    /// acceleration values apply raw; feedrate values apply raw only for
+    /// Marlin/Smoothie/Klipper and are converted from mm/min otherwise
+    /// (M203 is ignored entirely for Repetier).
     pub(super) fn update_axis_limits(&mut self, code: &str, acceleration: bool) {
+        if !acceleration && self.gcode_flavor == GCodeFlavor::Repetier {
+            return;
+        }
+        let factor = if acceleration
+            || matches!(
+                self.gcode_flavor,
+                GCodeFlavor::MarlinLegacy
+                    | GCodeFlavor::MarlinFirmware
+                    | GCodeFlavor::Klipper
+                    | GCodeFlavor::Smoothie
+            ) {
+            1.0
+        } else {
+            MMMIN_TO_MMSEC
+        };
         let limits = if acceleration {
             &mut self.max_acceleration
         } else {
             &mut self.max_feedrate
         };
         for (axis, letter) in ['X', 'Y', 'Z', 'E'].into_iter().enumerate() {
-            limits[axis] = word(code, letter).unwrap_or(limits[axis]);
+            limits[axis] =
+                word(code, letter).map_or(limits[axis], |value| (value as f32 * factor) as f64);
+        }
+    }
+
+    /// `GCodeProcessor.cpp:5400-5418`: M566 jerk limits are always
+    /// specified in mm/min and converted to mm/s.
+    pub(super) fn update_jerk_limits(&mut self, code: &str) {
+        for (axis, letter) in ['X', 'Y', 'Z', 'E'].into_iter().enumerate() {
+            self.jerk[axis] = word(code, letter).map_or(self.jerk[axis], |value| {
+                (value as f32 * MMMIN_TO_MMSEC) as f64
+            });
         }
     }
 

@@ -199,6 +199,10 @@ impl MotionState {
             }
             return None;
         }
+        if code.starts_with("M566") {
+            self.update_jerk_limits(code);
+            return None;
+        }
         if code.split_whitespace().next() == Some("SET_VELOCITY_LIMIT") {
             // Klipper: ACCEL applies to print and travel moves alike
             // (`GCodeProcessor.cpp:5269-5304`).
