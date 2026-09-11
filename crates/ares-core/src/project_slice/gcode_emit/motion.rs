@@ -318,13 +318,32 @@ fn emit_variable_width_entity(
 ) {
     match entity {
         GapFillEntity::Path(path) => materialized::emit_flat(output, path, 0.0, geometry, state),
-        GapFillEntity::Loop(paths) => loop_paths::emit(
-            output,
-            paths,
-            crate::project_slice::perimeters::classic::chained_loops::ExtrusionLoopRole::Internal,
-            geometry,
-            state,
-        ),
+        GapFillEntity::Loop(paths) => {
+            // `variable_width` (VariableWidth.cpp:224-227) closes up loop
+            // entities; `GCode::extrude_loop` then splits them at the point
+            // nearest to the last position (`GCode.cpp:5771`, the
+            // non-perimeter `loop.split_at(last_pos, false)` branch).
+            let mut loop_ = crate::project_slice::perimeters::classic::chained_loops::ExtrusionLoop {
+                paths: paths.clone(),
+                role: crate::project_slice::perimeters::classic::chained_loops::ExtrusionLoopRole::Internal,
+            };
+            crate::project_slice::seam_placement::place_nearest_projection(
+                &mut loop_,
+                crate::project_slice::perimeters::classic::materialize::Point3 {
+                    x: local_cursor(state, geometry).x(),
+                    y: local_cursor(state, geometry).y(),
+                    z: 0,
+                },
+                geometry.scale,
+            );
+            loop_paths::emit(
+                output,
+                &loop_.paths,
+                crate::project_slice::perimeters::classic::chained_loops::ExtrusionLoopRole::Internal,
+                geometry,
+                state,
+            )
+        }
     }
 }
 
