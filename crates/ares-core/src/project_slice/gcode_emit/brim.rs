@@ -139,13 +139,106 @@ impl BrimPlan {
         }
         let mut loops = Vec::new();
         while !area.is_empty() {
-            append_loops(&mut loops, &area, resolution);
+            if let Ok(path) = std::env::var("ARES_DUMP_STEP") {
+                use std::io::Write;
+                if let Ok(mut file) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(path)
+                {
+                    for expolygon in &area {
+                        let _ = write!(file, "STEP {}:", loops.len());
+                        for point in expolygon.contour().points() {
+                            let _ = write!(file, " ({},{})", point.x(), point.y());
+                        }
+                        let _ = writeln!(file);
+                    }
+                }
+            }
+            // Brim.cpp:826-827 — the loop-top douglas_peucker simplifies
+            // the islands IN PLACE: the harvested rings and the −1.3 offset
+            // input are the same simplified polygons.
+            for expolygon in &mut area {
+                expolygon.douglas_peucker(resolution);
+            }
+            if let Ok(path) = std::env::var("ARES_DUMP_POSTPEUCK") {
+                use std::io::Write;
+                if let Ok(mut file) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(path)
+                {
+                    for expolygon in &area {
+                        let _ = write!(file, "PP {}:", loops.len());
+                        for point in expolygon.contour().points() {
+                            let _ = write!(file, " ({},{})", point.x(), point.y());
+                        }
+                        let _ = writeln!(file);
+                    }
+                }
+            }
+            append_loops(&mut loops, &area);
             area = offset_expolygons(&area, -1.3f32 * spacing, JoinType::Round, resolution)
+                .map(|area| {
+                    if let Ok(path) = std::env::var("ARES_DUMP_M13") {
+                        use std::io::Write;
+                        if let Ok(mut file) = std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(path)
+                        {
+                            for expolygon in &area {
+                                let _ = write!(file, "M13 {}:", loops.len());
+                                for point in expolygon.contour().points() {
+                                    let _ = write!(file, " ({},{})", point.x(), point.y());
+                                }
+                                let _ = writeln!(file);
+                            }
+                        }
+                    }
+                    area
+                })
                 .and_then(|mut area| {
                     for expolygon in &mut area {
                         expolygon.douglas_peucker(resolution);
                     }
-                    offset_expolygons(&area, 0.3f32 * spacing, JoinType::Round, resolution)
+                    if let Ok(path) = std::env::var("ARES_DUMP_PEUCK2") {
+                        use std::io::Write;
+                        if let Ok(mut file) = std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(path)
+                        {
+                            for expolygon in &area {
+                                let _ = write!(file, "P2:");
+                                for point in expolygon.contour().points() {
+                                    let _ = write!(file, " ({},{})", point.x(), point.y());
+                                }
+                                let _ = writeln!(file);
+                            }
+                        }
+                    }
+                    offset_expolygons(&area, 0.3f32 * spacing, JoinType::Round, resolution).map(
+                        |area| {
+                            if let Ok(path) = std::env::var("ARES_DUMP_PEUCK") {
+                                use std::io::Write;
+                                if let Ok(mut file) = std::fs::OpenOptions::new()
+                                    .create(true)
+                                    .append(true)
+                                    .open(path)
+                                {
+                                    for expolygon in &area {
+                                        let _ = write!(file, "PEU {}:", loops.len());
+                                        for point in expolygon.contour().points() {
+                                            let _ = write!(file, " ({},{})", point.x(), point.y());
+                                        }
+                                        let _ = writeln!(file);
+                                    }
+                                }
+                            }
+                            area
+                        },
+                    )
                 })
                 .map_err(brim_geometry_error)?;
         }
@@ -320,18 +413,10 @@ impl BrimPlan {
     }
 }
 
-fn append_loops(output: &mut Vec<Vec<Point>>, area: &[ExPolygon], tolerance: f64) {
+fn append_loops(output: &mut Vec<Vec<Point>>, area: &[ExPolygon]) {
     for expolygon in area {
-        output.push(simplify_closed_points(
-            expolygon.contour().points().to_vec(),
-            tolerance,
-        ));
-        output.extend(
-            expolygon
-                .holes()
-                .iter()
-                .map(|hole| simplify_closed_points(hole.points().to_vec(), tolerance)),
-        );
+        output.push(expolygon.contour().points().to_vec());
+        output.extend(expolygon.holes().iter().map(|hole| hole.points().to_vec()));
     }
     output.retain(|points| points.len() >= 3);
 }
