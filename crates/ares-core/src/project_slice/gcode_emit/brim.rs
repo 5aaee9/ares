@@ -141,22 +141,6 @@ impl BrimPlan {
         )
         .map_err(brim_geometry_error)?;
         let mut loops = unified;
-        // Rotate each ring to start at its lowest-left vertex so
-        // consecutive rings anchor at the same corner — the EvenOdd
-        // contour/hole walk alternates anchors otherwise and the
-        // reversal tie breaks arbitrarily.
-        for points in &mut loops {
-            if points.len() < 2 {
-                continue;
-            }
-            let mut anchor = 0usize;
-            for (index, point) in points.iter().enumerate() {
-                if (point.x(), point.y()) < (points[anchor].x(), points[anchor].y()) {
-                    anchor = index;
-                }
-            }
-            points.rotate_left(anchor);
-        }
         // The union's contour-then-holes order IS the outside-in nesting
         // (`traverse_pt_outside_in` recursion — the area sort would
         // re-interleave nested rings destructively).
