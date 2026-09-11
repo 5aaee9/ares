@@ -160,6 +160,15 @@ impl FanMover {
             if motion.has_f {
                 self.current_speed = motion.f_mm_s;
             }
+            // GCodeReader only tracks position for G0/G1/G2/G3/G92 —
+            // axis words on M/T commands (e.g. `M205 X12 Y12`) must not
+            // teleport the tracked position.
+            if !command.starts_with('G') {
+                motion.x = None;
+                motion.y = None;
+                motion.z = None;
+                motion.e = None;
+            }
             match command.as_bytes()[0] {
                 b'T' => need_flush = true,
                 b'G' => {
@@ -228,6 +237,8 @@ impl FanMover {
         }
 
         if time >= 0.0 {
+            let start = self.position;
+            let e_start = self.e_position;
             if let Some(x) = motion.x {
                 self.position[0] = if self.relative_xyz {
                     self.position[0] + x
@@ -262,6 +273,8 @@ impl FanMover {
             self.push_buffer(
                 BufferData::new(raw.to_owned(), time, fan_speed, false),
                 &motion,
+                start,
+                e_start,
             );
             if let Some(mut kick) = self.current_kickstart {
                 if time > 0.0 {
@@ -328,10 +341,8 @@ impl FanMover {
                         self.buffer_time_size - self.nb_seconds_delay,
                         &set_fan_line(100),
                     );
-                    self.buffer.remove(0);
                 } else {
                     self.output.push_str(&set_fan_line(100));
-                    self.output.push('\n');
                 }
                 let kickstart_duration =
                     self.kickstart * f32::from(fan_speed - self.front_buffer_fan_speed) / 100.0;
@@ -360,7 +371,6 @@ impl FanMover {
                     && (self.buffer_time_size - self.buffer[0].time * 0.1) > self.nb_seconds_delay
                 {
                     self.print_in_middle(0, self.buffer_time_size - self.nb_seconds_delay, raw);
-                    self.buffer.remove(0);
                 } else {
                     self.output.push_str(raw);
                     self.output.push('\n');
@@ -390,6 +400,8 @@ impl FanMover {
             self.push_buffer(
                 BufferData::new(set_fan_line(100), 0.0, fan_speed, true),
                 &LineMotion::default(),
+                self.position,
+                self.e_position,
             );
             self.current_kickstart = Some(Kickstart {
                 fan_speed,
@@ -399,23 +411,32 @@ impl FanMover {
         }
     }
 
-    fn push_buffer(&mut self, data: BufferData, motion: &LineMotion) {
+    fn push_buffer(
+        &mut self,
+        data: BufferData,
+        motion: &LineMotion,
+        start: [f32; 3],
+        e_start: f32,
+    ) {
         self.buffer_time_size += data.time;
         let mut data = data;
-        if let Some(x) = motion.x {
-            data.x = x;
+        // FanMover.cpp:444-449 stores the START coordinate (reader position
+        // before the move) plus the delta; the split math `x + dx*percent`
+        // interpolates within the segment.
+        if motion.x.is_some() {
+            data.x = start[0];
             data.dx = motion.dx;
         }
-        if let Some(y) = motion.y {
-            data.y = y;
+        if motion.y.is_some() {
+            data.y = start[1];
             data.dy = motion.dy;
         }
-        if let Some(z) = motion.z {
-            data.z = z;
+        if motion.z.is_some() {
+            data.z = start[2];
             data.dz = motion.dz;
         }
-        if let Some(e) = motion.e {
-            data.e = e;
+        if motion.e.is_some() {
+            data.e = e_start;
             data.de = motion.de;
         }
         self.buffer.push(data);
@@ -435,12 +456,26 @@ impl FanMover {
                 split_line(&mut self.buffer[index], percent, self.relative_e);
             let before = BufferData::new(before_raw, nb_sec, -1, false);
             let after_time = item_time - nb_sec;
+            // FanMover.cpp:131-142: advance the remaining item's start
+            // coordinates by the consumed prefix delta.
+            let (dx, dy, dz, de) = (
+                self.buffer[index].dx,
+                self.buffer[index].dy,
+                self.buffer[index].dz,
+                self.buffer[index].de,
+            );
+            self.buffer[index].x += dx * percent;
+            self.buffer[index].y += dy * percent;
+            self.buffer[index].z += dz * percent;
+            if !self.relative_e {
+                self.buffer[index].e += de * percent;
+            }
             self.buffer[index].raw = after_raw;
             self.buffer[index].time = after_time;
-            self.buffer[index].dx *= 1.0 - percent;
-            self.buffer[index].dy *= 1.0 - percent;
-            self.buffer[index].dz *= 1.0 - percent;
-            self.buffer[index].de *= 1.0 - percent;
+            self.buffer[index].dx = dx * (1.0 - percent);
+            self.buffer[index].dy = dy * (1.0 - percent);
+            self.buffer[index].dz = dz * (1.0 - percent);
+            self.buffer[index].de = de * (1.0 - percent);
             self.buffer.insert(index, line);
             self.buffer.insert(index, before);
             self.buffer_time_size += 0.0;
@@ -456,10 +491,14 @@ impl FanMover {
             self.output.push_str(&item.raw);
             self.output.push('\n');
             self.output.push_str(fan_line);
-            self.output.push('\n');
+            if !fan_line.ends_with('\n') {
+                self.output.push('\n');
+            }
         } else if nb_sec > item.time * 0.9 || !item.raw.starts_with("G1 ") {
             self.output.push_str(fan_line);
-            self.output.push('\n');
+            if !fan_line.ends_with('\n') {
+                self.output.push('\n');
+            }
             self.output.push_str(&item.raw);
             self.output.push('\n');
         } else {
@@ -469,7 +508,9 @@ impl FanMover {
             self.output.push_str(&before);
             self.output.push('\n');
             self.output.push_str(fan_line);
-            self.output.push('\n');
+            if !fan_line.ends_with('\n') {
+                self.output.push('\n');
+            }
             self.output.push_str(&after);
             self.output.push('\n');
         }
@@ -491,7 +532,10 @@ impl FanMover {
 }
 
 fn set_fan_line(percent: i16) -> String {
-    format!("M106 S{}", fan_pwm(percent))
+    // `GCodeWriter::set_fan` (GCodeWriter.cpp:1114) terminates the command
+    // with a newline; a buffered kickstart line then flushes as `raw + "\n"`
+    // leaving a blank line after the command, matching upstream.
+    format!("M106 S{}\n", fan_pwm(percent))
 }
 
 fn fan_pwm(percent: i16) -> u32 {

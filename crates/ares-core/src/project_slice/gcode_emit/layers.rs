@@ -3,7 +3,7 @@ use super::{
     GenerationMetadata, PreparedPostIslandPrintOrder, SliceError, append_layer_end_timelapse, brim,
     cooling, fan_mover, footprint, format_processor_float, island_print_order,
     layer_boundary_slices, layer_gcode, machine, motion, object, skirt, spiral_vase, timelapse,
-    trailing_gcode_xy, trailing_gcode_z, value,
+    trailing_gcode_xy, value,
 };
 use crate::geometry::ExPolygon;
 

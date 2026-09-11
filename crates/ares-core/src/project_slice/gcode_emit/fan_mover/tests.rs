@@ -55,3 +55,26 @@ fn kickstart_full_speed_precedes_eventual_target() {
     assert!(target.is_some(), "target line missing: {out}");
     assert!(full < target);
 }
+
+#[test]
+fn kickstart_target_lands_half_second_later() {
+    // Regression (CONSTRUCT3D Construct 1, fan_speedup_time=1, fan_kickstart=0.5):
+    // the kickstart target M106 lands 0.5s after the direct kickstart print —
+    // after the third wall move — not immediately after the travel.
+    let mut fan_mover = mover(1.0, 0.5);
+    let out = fan_mover.process_gcode(
+        "G1 X108.927 Y134.04 F3000\nM106 S255\nG92 E0\nG1 E-.49 F3000\nG1 F6000\nG1 X109.005 Y134.04 E-.01632\nM204 P4000\nG3 Z.66 I-.056 J.606 P1 F19200\nG1 X117.3 Y134.8 Z.66\nG1 Z.46\nG1 E.7 F3000\nG1 F3763\nG1 X107.7 Y134.8 E.20259\nG1 X107.7 Y125.2 E.20259\nG1 X117.3 Y125.2 E.20259\nG1 X117.3 Y134.76 E.20174\n",
+        true,
+    );
+    let second = out
+        .match_indices("M106 S255")
+        .nth(1)
+        .map(|(i, _)| i)
+        .unwrap();
+    let anchor = out.find("G1 X117.3 Y125.2 E.20259").unwrap();
+    let next_wall = out.find("G1 X117.3 Y134.76 E.20174").unwrap();
+    assert!(
+        second > anchor && second < next_wall,
+        "kickstart target misplaced:\n{out}"
+    );
+}

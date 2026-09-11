@@ -20,7 +20,6 @@ mod geometry;
 mod tests;
 
 pub(in crate::project_slice::gcode_emit) use geometry::convex_hull;
-pub(in crate::project_slice::gcode_emit) use geometry::split_at_nearest_for_brim;
 use geometry::{closed_length, find_start_point, split_at_nearest};
 
 pub(super) struct SkirtPlan {
