@@ -261,9 +261,11 @@ impl FanMover {
                 };
             }
             if let Some(e) = motion.e {
-                if !self.relative_e {
-                    motion.de = e - self.e_position;
-                }
+                motion.de = if self.relative_e {
+                    e
+                } else {
+                    e - self.e_position
+                };
                 self.e_position = if self.relative_e {
                     self.e_position + e
                 } else {
