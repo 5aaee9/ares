@@ -80,7 +80,27 @@ pub(super) fn loop_project_intersections(
                         volume.into_parts();
                     let layers = layers
                         .into_iter()
-                        .map(|layer| make_loops(layer, max_gap_scaled))
+                        .enumerate()
+                        .map(|(layer_index, layer)| {
+                            let looped = make_loops(layer, max_gap_scaled);
+                            if let Ok(path) = std::env::var("ARES_DUMP_SLICE") {
+                                use std::io::Write;
+                                if let Ok(mut file) = std::fs::OpenOptions::new()
+                                    .create(true)
+                                    .append(true)
+                                    .open(path)
+                                {
+                                    for polygon in looped.polygons() {
+                                        let _ = write!(file, "SLICE {layer_index}:");
+                                        for point in polygon.points() {
+                                            let _ = write!(file, " ({},{})", point.x(), point.y());
+                                        }
+                                        let _ = writeln!(file);
+                                    }
+                                }
+                            }
+                            looped
+                        })
                         .collect();
                     LoopedVolumeIntersections {
                         source_volume_index,

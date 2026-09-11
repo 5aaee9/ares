@@ -70,7 +70,38 @@ pub(in crate::project_slice) fn materialize_overhang_from_lower(
     let subject = std::slice::from_ref(&polygon);
     let inside = intersection_pl(subject, &filtered).map_err(map_clipper_error)?;
     let remain = diff_pl(subject, &filtered).map_err(map_clipper_error)?;
+    if let Ok(path) = std::env::var("ARES_DUMP_PERIM") {
+        use std::io::Write;
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
+            for point in polygon.points() {
+                let _ = writeln!(file, "PERIM ({},{})", point.x(), point.y());
+            }
+        }
+    }
     let mut paths = Vec::with_capacity(inside.len() + remain.len());
+    if let Ok(path) = std::env::var("ARES_DUMP_PERIM_PATHS") {
+        use std::io::Write;
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
+            for polyline in &inside {
+                for point in polyline.points() {
+                    let _ = writeln!(file, "PERIMP ({},{})", point.x(), point.y());
+                }
+            }
+            for polyline in &remain {
+                for point in polyline.points() {
+                    let _ = writeln!(file, "PERIMP ({},{})", point.x(), point.y());
+                }
+            }
+        }
+    }
     paths.extend(
         inside
             .into_iter()
@@ -112,6 +143,18 @@ fn materialize_ordinary_polygon(
     polygon: &Polygon,
     layer_height: f64,
 ) -> Vec<ExtrusionPath> {
+    if let Ok(path) = std::env::var("ARES_DUMP_PERIM") {
+        use std::io::Write;
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
+            for point in polygon.points() {
+                let _ = writeln!(file, "PERIM ({},{})", point.x(), point.y());
+            }
+        }
+    }
     vec![path(
         polygon.split_at_first_point(),
         role(seed.extrusion_role),

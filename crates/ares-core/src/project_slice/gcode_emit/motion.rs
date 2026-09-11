@@ -209,6 +209,31 @@ pub(super) fn emit_skirt_loop(
     // `GCode.cpp:5979-5991` stores loop wipe paths forward so the wipe
     // wraps from the loop end back toward the path start.
     state.wipe_path.reverse();
+    if let Ok(path) = std::env::var("ARES_DUMP_FULLLOOP") {
+        use std::io::Write;
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
+            let mut scaled = state
+                .wipe_path
+                .iter()
+                .map(|point| {
+                    let x = ((point.x - state.offset.0) / state.scale_factor).round() as i64;
+                    let y = ((point.y - state.offset.1) / state.scale_factor).round() as i64;
+                    (x, y)
+                })
+                .collect::<Vec<_>>();
+            // the wipe stores the path in reverse emission order; dump in
+            // forward path order like upstream's `this->path.points`
+            scaled.reverse();
+            for (x, y) in scaled {
+                let _ = writeln!(file, "FL ({x},{y})");
+            }
+            let _ = writeln!(file, "FL_END");
+        }
+    }
 }
 
 pub(super) fn emit_layer<F>(
