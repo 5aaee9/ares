@@ -1,7 +1,7 @@
 use super::{Movement, format_axis, format_e, set_word, word_value};
 use crate::{
     Point2,
-    gcode_spiral_vase::{distance, interpolate, nearest_point_on_polyline},
+    gcode_spiral_vase::{distance, distance_f32, nearest_point_on_polyline},
 };
 
 pub(super) struct SmoothRequest<'a> {
@@ -28,15 +28,26 @@ pub(super) fn smooth_line(
     } = request;
     let original = Point2::new(movement.target_x, movement.target_y);
     current_layer.push(original);
-    let Some(nearest) = nearest_point_on_polyline(previous_layer, original) else {
+    // Upstream `SpiralVaseHelpers` computes the projection, distance gate,
+    // and interpolation entirely in float before the X/Y words format.
+    let original_f = [movement.target_x as f32, movement.target_y as f32];
+    let previous_layer_f = previous_layer
+        .iter()
+        .map(|point| [point.x() as f32, point.y() as f32])
+        .collect::<Vec<_>>();
+    let Some(nearest) = nearest_point_on_polyline(&previous_layer_f, original_f) else {
         *last_emitted = Some(original);
         return Some(normal);
     };
-    if distance(nearest, original) >= maximum_distance {
+    if f64::from(distance_f32(nearest, original_f)) >= maximum_distance {
         *last_emitted = Some(original);
         return Some(normal);
     }
-    let target = interpolate(nearest, original, progress);
+    let factor = progress as f32;
+    let target = Point2::new(
+        f64::from(nearest[0] * (1.0 - factor) + original_f[0] * factor),
+        f64::from(nearest[1] * (1.0 - factor) + original_f[1] * factor),
+    );
     let adjusted_length = distance(last_emitted.unwrap_or(original), target);
     if adjusted_length < minimum_segment_length {
         return None;

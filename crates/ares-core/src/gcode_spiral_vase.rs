@@ -200,11 +200,24 @@ impl SpiralVaseLayerState {
         if !self.smooth_xy {
             return point;
         }
-        let Some(previous) = nearest_point_on_polyline(&self.previous_layer_points, point) else {
+        // Upstream `SpiralVaseHelpers` runs entirely in float: distance,
+        // projection, and the `(1-factor)` interpolation all round at
+        // f32 before the X/Y words are formatted.
+        let p = [point.x() as f32, point.y() as f32];
+        let previous = self
+            .previous_layer_points
+            .iter()
+            .map(|point| [point.x() as f32, point.y() as f32])
+            .collect::<Vec<_>>();
+        let Some(previous) = nearest_point_on_polyline(&previous, p) else {
             return point;
         };
-        if distance(previous, point) < self.max_xy_smoothing {
-            interpolate(previous, point, progress)
+        if distance_f32(previous, p) < self.max_xy_smoothing as f32 {
+            let factor = progress as f32;
+            Point2::new(
+                f64::from(previous[0] * (1.0 - factor) + p[0] * factor),
+                f64::from(previous[1] * (1.0 - factor) + p[1] * factor),
+            )
         } else {
             point
         }
@@ -230,30 +243,27 @@ fn distance(start: Point2, end: Point2) -> f64 {
     ((end.x() - start.x()).powi(2) + (end.y() - start.y()).powi(2)).sqrt()
 }
 
-fn nearest_point_on_polyline(points: &[Point2], point: Point2) -> Option<Point2> {
+fn distance_f32(start: [f32; 2], end: [f32; 2]) -> f32 {
+    ((end[0] - start[0]).powi(2) + (end[1] - start[1]).powi(2)).sqrt()
+}
+
+fn nearest_point_on_polyline(points: &[[f32; 2]], point: [f32; 2]) -> Option<[f32; 2]> {
     points
         .windows(2)
         .map(|segment| project_point_to_segment(segment[0], segment[1], point))
-        .min_by(|left, right| distance(*left, point).total_cmp(&distance(*right, point)))
+        .min_by(|left, right| distance_f32(*left, point).total_cmp(&distance_f32(*right, point)))
 }
 
-fn project_point_to_segment(start: Point2, end: Point2, point: Point2) -> Point2 {
-    let dx = end.x() - start.x();
-    let dy = end.y() - start.y();
+fn project_point_to_segment(start: [f32; 2], end: [f32; 2], point: [f32; 2]) -> [f32; 2] {
+    let dx = end[0] - start[0];
+    let dy = end[1] - start[1];
     let length_squared = dx * dx + dy * dy;
-    if length_squared <= f64::EPSILON {
+    if length_squared <= f32::EPSILON {
         return start;
     }
-    let t = (((point.x() - start.x()) * dx + (point.y() - start.y()) * dy) / length_squared)
+    let t = (((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / length_squared)
         .clamp(0.0, 1.0);
-    Point2::new(start.x() + dx * t, start.y() + dy * t)
-}
-
-fn interpolate(start: Point2, end: Point2, progress: f64) -> Point2 {
-    Point2::new(
-        start.x() * (1.0 - progress) + end.x() * progress,
-        start.y() * (1.0 - progress) + end.y() * progress,
-    )
+    [start[0] + dx * t, start[1] + dy * t]
 }
 
 fn parse_max_xy_smoothing(options: &SliceOptions, nozzle_diameter: f64) -> Result<f64, SliceError> {
