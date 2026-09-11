@@ -83,7 +83,11 @@ impl BrimPlan {
         let flow =
             build_nonbridging_flow(width, print.initial_layer_print_height.0 as f32, nozzle)?;
         let scale = traversal.scale;
-        let spacing_mm = f64::from(flow.spacing);
+        // Upstream quantizes the flow width through the scaled lattice:
+        // `flowWidth = print.brim_flow().scaled_spacing() * SCALING_FACTOR`
+        // (Brim.cpp:463) — an integer round-trip, not the f32 spacing
+        // value directly.
+        let spacing_mm = f64::from(scaled_f32(scale, f64::from(flow.spacing))?) * scale.factor();
         let brim_width_mm = (options.brim_width.0 / spacing_mm / 2.0).floor() * spacing_mm * 2.0;
         if brim_width_mm <= 0.0 {
             return Ok(None);
@@ -103,6 +107,22 @@ impl BrimPlan {
                 .collect::<Vec<_>>(),
         );
         let brim_area = difference_ex(&outer, &inner).map_err(brim_geometry_error)?;
+        if let Ok(path) = std::env::var("ARES_DUMP_BRIMAREA") {
+            use std::io::Write;
+            if let Ok(mut file) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+            {
+                for expolygon in &brim_area {
+                    let _ = write!(file, "BA n={}:", expolygon.contour().points().len());
+                    for point in expolygon.contour().points() {
+                        let _ = write!(file, " ({},{})", point.x(), point.y());
+                    }
+                    let _ = writeln!(file);
+                }
+            }
+        }
         // `Brim.cpp:824-832` — every stage of the loop stepping runs a
         // douglas_peucker pass with `resolution` (0.0125 mm) between the
         // offsets: on the input area, after the −0.5 spacing opening, and
