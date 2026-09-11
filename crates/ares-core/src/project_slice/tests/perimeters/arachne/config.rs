@@ -88,12 +88,9 @@ fn task22w9_rejects_deferred_scopes_typed() {
         validate(&region, 3, Some(4)).unwrap_err(),
         SliceError::UnsupportedProjectFeature("overhang_reverse".to_owned())
     );
-    let mut region = default_region();
-    region.wall_sequence = crate::ProcessWallSequence::InnerOuterInner;
-    assert_eq!(
-        validate(&region, 3, Some(4)).unwrap_err(),
-        SliceError::UnsupportedProjectFeature("wall_sequence".to_owned())
-    );
+    // wall_sequence InnerOuterInner is now implemented by the sandwich
+    // reordering (`PerimeterGenerator.cpp:2374-2464`); only the scope
+    // gates below remain typed rejections.
     let mut region = default_region();
     region.only_one_wall_top.0 = true;
     assert_eq!(

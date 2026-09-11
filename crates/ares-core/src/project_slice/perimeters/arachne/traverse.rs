@@ -36,7 +36,7 @@ use super::variable_width;
 /// `PerimeterGeneratorArachneExtrusion` (`PerimeterGenerator.cpp:363-367`):
 /// one ordered wall line plus the contour flag computed by the candidate
 /// traversal (`is_contour()` at `:2363`).
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(in crate::project_slice) struct PerimeterGeneratorArachneExtrusion {
     pub(in crate::project_slice) extrusion: ExtrusionLine,
     pub(in crate::project_slice) is_contour: bool,

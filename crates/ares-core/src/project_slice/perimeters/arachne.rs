@@ -8,6 +8,7 @@
 pub(in crate::project_slice) mod config;
 pub(in crate::project_slice) mod materialize;
 pub(in crate::project_slice) mod order;
+pub(in crate::project_slice) mod sandwich;
 pub(in crate::project_slice) mod traverse;
 pub(in crate::project_slice) mod variable_width;
 pub(in crate::project_slice) mod walls;

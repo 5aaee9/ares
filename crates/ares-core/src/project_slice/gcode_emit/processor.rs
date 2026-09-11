@@ -109,12 +109,18 @@ pub(super) fn process(
         let Some(elapsed) = estimate.elapsed_at(index + 1).map(|elapsed| elapsed as f32) else {
             continue;
         };
-        let percent = if estimate.total > 0.0 {
-            (f64::from(100.0_f32 * elapsed) / estimate.total).clamp(0.0, 99.0) as u64
+        // Upstream computes the progress pair entirely in f32
+        // (`GCodeProcessor.cpp:1251-1252`): `int(100.0f * elapsed_time /
+        // machine.time)` over the float `machine.time`, and
+        // `time_in_minutes(machine.time - elapsed_time)` on float operands —
+        // f64 arithmetic flips boundary crossings against the float cache.
+        let total = estimate.total as f32;
+        let percent = if total > 0.0 {
+            (100.0_f32 * elapsed / total) as u64
         } else {
             0
         };
-        let remaining = minutes(estimate.total - f64::from(elapsed));
+        let remaining = minutes(f64::from(total - elapsed));
         if last_progress != Some((percent, remaining)) {
             last_progress = Some((percent, remaining));
             result.push_str(&format!("M73 P{percent} R{remaining}\n"));

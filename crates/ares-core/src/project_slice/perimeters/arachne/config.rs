@@ -59,11 +59,6 @@ pub(in crate::project_slice) fn validate_record(
         // (`PerimeterGenerator.cpp:449-478,2472-2474`).
         return Err(unsupported("overhang_reverse"));
     }
-    if region.wall_sequence == crate::ProcessWallSequence::InnerOuterInner {
-        // `reorderPerimetersByProximity` sandwich reordering
-        // (`PerimeterGenerator.cpp:2404-2464`).
-        return Err(unsupported("wall_sequence"));
-    }
     if region.only_one_wall_top.0 && upper_layer_index.is_some() {
         // Top-surface single-wall regeneration
         // (`PerimeterGenerator.cpp:2168-2224`).
