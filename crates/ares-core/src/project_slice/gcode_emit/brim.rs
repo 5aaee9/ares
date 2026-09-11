@@ -156,29 +156,48 @@ impl BrimPlan {
         let mut previous_end: Option<Point> = None;
         let mut connected: Vec<Vec<Point>> = Vec::new();
         for mut points in loops {
-            // drop the closing duplication — rings are open polylines
-            if points.len() > 1 && points.first() == points.last() {
-                points.pop();
-            }
-            if let Some(end) = previous_end {
-                let distance = |point: &Point| {
-                    let dx = (point.x() - end.x()) as f64;
-                    let dy = (point.y() - end.y()) as f64;
-                    dx * dx + dy * dy
-                };
+            // `connect_brim_lines` (Brim.cpp:775-797) joins two successive
+            // polylines only when BOTH are open (`! prev.is_closed() &&
+            // ! next.is_closed()`); closed rings are never merged — keep
+            // the closing point and skip the reversal for closed rings
+            // (`optimize_polylines_by_reversing` finds equal endpoint
+            // distances and never flips a closed ring).
+            // Clipper's closed output contours carry the duplicated
+            // closing point (`node->Contour`), so upstream's brim ring
+            // polylines are closed — `to_polylines` keeps the duplicate.
+            // Close each ring the same way; the `is_closed` guard below
+            // then mirrors `connect_brim_lines`'s no-merge rule.
+            if points.len() > 1 && points.first() != points.last() {
                 let first = points[0];
-                let last = points[points.len() - 1];
-                if distance(&last) < distance(&first) {
-                    points.reverse();
+                points.push(first);
+            }
+            let is_closed = points.len() > 1 && points.first() == points.last();
+            if !is_closed {
+                if let Some(end) = previous_end {
+                    let distance = |point: &Point| {
+                        let dx = (point.x() - end.x()) as f64;
+                        let dy = (point.y() - end.y()) as f64;
+                        dx * dx + dy * dy
+                    };
+                    let first = points[0];
+                    let last = points[points.len() - 1];
+                    if distance(&last) < distance(&first) {
+                        points.reverse();
+                    }
                 }
             }
             let spacing_squared = f64::from(spacing) * f64::from(spacing) * 4.0;
-            let gap_ok = previous_end.is_some_and(|end| {
-                let start = points[0];
-                let dx = (start.x() - end.x()) as f64;
-                let dy = (start.y() - end.y()) as f64;
-                dx.mul_add(dx, dy * dy) <= spacing_squared
-            });
+            let previous_closed = connected
+                .last()
+                .is_some_and(|tail: &Vec<Point>| tail.len() > 1 && tail.first() == tail.last());
+            let gap_ok = !is_closed
+                && !previous_closed
+                && previous_end.is_some_and(|end| {
+                    let start = points[0];
+                    let dx = (start.x() - end.x()) as f64;
+                    let dy = (start.y() - end.y()) as f64;
+                    dx.mul_add(dx, dy * dy) <= spacing_squared
+                });
             if gap_ok {
                 let tail = connected.last_mut().expect("gap_ok implies a tail");
                 tail.extend_from_slice(&points);
@@ -191,10 +210,28 @@ impl BrimPlan {
         let paths = connected
             .into_iter()
             .map(|mut points| {
-                points.push(points[0]);
+                if points.len() > 1 && points.first() != points.last() {
+                    points.push(points[0]);
+                }
                 points
             })
             .collect::<Vec<_>>();
+        if let Ok(path) = std::env::var("ARES_DUMP_BRIM") {
+            use std::io::Write;
+            if let Ok(mut file) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+            {
+                for ring in &paths {
+                    let _ = write!(file, "BRIM n={}:", ring.len());
+                    for point in ring {
+                        let _ = write!(file, " ({},{})", point.x(), point.y());
+                    }
+                    let _ = writeln!(file);
+                }
+            }
+        }
         if paths.is_empty() {
             return Ok(None);
         }
