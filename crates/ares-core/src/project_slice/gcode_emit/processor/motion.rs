@@ -259,10 +259,13 @@ impl MotionState {
         self.e_position = old_e + e_delta;
         self.position = next;
         // Upstream always tracks the position; a non-positive feedrate only
-        // suppresses the motion block (no time contribution).
-        if self.feedrate <= 0.0 {
-            return None;
-        }
+        // Upstream always tracks the position and creates the TimeBlock for
+        // any displaced move; `Trapezoid::cruise_time()` returns 0 when
+        // `cruise_feedrate == 0` (`GCodeProcessor.hpp:439`), so blocks with
+        // zero feedrate contribute zero time but still occupy a
+        // g1_times_cache entry — the M73 lookup depends on it.
+        // The block's `speed` field carries the (possibly zero) feedrate;
+        // the schedule treats zero-speed blocks as zero-time.
         let mut delta = [
             next[0] - old[0],
             next[1] - old[1],
