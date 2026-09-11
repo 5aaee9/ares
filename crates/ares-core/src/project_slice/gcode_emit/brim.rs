@@ -131,20 +131,21 @@ impl BrimPlan {
         for expolygon in &mut brim_area {
             expolygon.douglas_peucker(resolution);
         }
-        let mut area = offset_expolygons(&brim_area, -0.5 * spacing, JoinType::Round, resolution)
-            .map_err(brim_geometry_error)?;
+        let mut area =
+            offset_expolygons(&brim_area, -0.5f32 * spacing, JoinType::Round, resolution)
+                .map_err(brim_geometry_error)?;
         for expolygon in &mut area {
             expolygon.douglas_peucker(resolution);
         }
         let mut loops = Vec::new();
         while !area.is_empty() {
             append_loops(&mut loops, &area, resolution);
-            area = offset_expolygons(&area, -1.3 * spacing, JoinType::Round, resolution)
+            area = offset_expolygons(&area, -1.3f32 * spacing, JoinType::Round, resolution)
                 .and_then(|mut area| {
                     for expolygon in &mut area {
                         expolygon.douglas_peucker(resolution);
                     }
-                    offset_expolygons(&area, 0.3 * spacing, JoinType::Round, resolution)
+                    offset_expolygons(&area, 0.3f32 * spacing, JoinType::Round, resolution)
                 })
                 .map_err(brim_geometry_error)?;
         }
