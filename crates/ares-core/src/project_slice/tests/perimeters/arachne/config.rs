@@ -91,12 +91,8 @@ fn task22w9_rejects_deferred_scopes_typed() {
     // wall_sequence InnerOuterInner is now implemented by the sandwich
     // reordering (`PerimeterGenerator.cpp:2374-2464`); only the scope
     // gates below remain typed rejections.
-    let mut region = default_region();
-    region.only_one_wall_top.0 = true;
-    assert_eq!(
-        validate(&region, 3, Some(4)).unwrap_err(),
-        SliceError::UnsupportedProjectFeature("only_one_wall_top".to_owned())
-    );
+    // only_one_wall_top is now implemented by the top-surface
+    // regeneration (`PerimeterGenerator.cpp:2160-2248`).
     let mut region = default_region();
     region.alternate_extra_wall.0 = true;
     region.sparse_infill_density = Percent(15.0);

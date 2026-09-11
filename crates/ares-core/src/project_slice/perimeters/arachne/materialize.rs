@@ -115,10 +115,20 @@ fn materialize_record(
     let spacings = ArachneSpacings::new(
         scale,
         input.perimeter_flow.spacing,
+        input.perimeter_flow.width,
         input.ext_perimeter_flow.width,
         input.ext_perimeter_flow.spacing,
         input.solid_infill_flow.spacing,
     )?;
+    // `min_width_top_surface.get_abs_value(unscale_(perimeter_width))`
+    // (`PerimeterGenerator.cpp:2210`): resolve the percent over the
+    // perimeter flow width.
+    let min_width_top_surface_mm = match region.min_width_top_surface {
+        crate::FloatOrPercent::Float(value) => value,
+        crate::FloatOrPercent::Percent(percent) => {
+            f64::from(input.perimeter_flow.width) * percent.0 / 100.0
+        }
+    };
     let overlaps = InfillOverlapPercents {
         infill_wall_overlap: region.infill_wall_overlap.0,
         top_bottom_infill_wall_overlap: region.top_bottom_infill_wall_overlap.0,
@@ -128,6 +138,19 @@ fn materialize_record(
     let mut fill_no_overlap = Vec::new();
     // we need each island separately (`PerimeterGenerator.cpp:2124-2126`).
     for surface in object.current_surfaces(input) {
+        // `only_one_wall_top` regeneration inputs (`PerimeterGenerator.cpp:2160-2175`):
+        // gated on the upper layer existing (non-topmost).
+        let top_surface =
+            object
+                .upper_slices(input)
+                .map(|upper_slices| super::top_surface::TopSurfaceInputs {
+                    upper_slices,
+                    upper_same_region: object.upper_same_region_surfaces(input),
+                    lower_slices: object.lower_slices(input),
+                    interface_shells: object_options.interface_shells.0,
+                    min_width_top_surface_mm,
+                    perimeter_width: spacings.perimeter_width,
+                });
         let generated = walls::generate_surface_walls(
             surface,
             &config,
@@ -135,6 +158,7 @@ fn materialize_record(
             region.wall_loops.0,
             input.layer_height,
             scale,
+            top_surface.as_ref(),
         )?;
         // `loop_number = int(perimeters.size()) - 1`
         // (`PerimeterGenerator.cpp:2466`).

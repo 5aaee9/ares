@@ -59,11 +59,6 @@ pub(in crate::project_slice) fn validate_record(
         // (`PerimeterGenerator.cpp:449-478,2472-2474`).
         return Err(unsupported("overhang_reverse"));
     }
-    if region.only_one_wall_top.0 && upper_layer_index.is_some() {
-        // Top-surface single-wall regeneration
-        // (`PerimeterGenerator.cpp:2168-2224`).
-        return Err(unsupported("only_one_wall_top"));
-    }
     if region.alternate_extra_wall.0 && layer_id % 2 == 1 && region.sparse_infill_density.0 > 0.0 {
         // Alternating extra wall (`PerimeterGenerator.cpp:2116-2117`).
         return Err(unsupported("alternate_extra_wall"));

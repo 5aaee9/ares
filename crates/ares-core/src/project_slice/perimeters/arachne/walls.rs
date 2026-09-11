@@ -19,7 +19,7 @@ use crate::{
 use super::config::ArachneRecordConfig;
 
 const INSET_OVERLAP_TOLERANCE: f64 = 0.4;
-const MITER_LIMIT: f64 = 3.0;
+pub(in crate::project_slice) const MITER_LIMIT: f64 = 3.0;
 
 /// One island's generated walls and inner contour
 /// (`PerimeterGenerator.cpp:2148-2176`).
@@ -33,6 +33,9 @@ pub(in crate::project_slice) struct GeneratedSurfaceWalls {
 #[derive(Clone, Copy)]
 pub(in crate::project_slice) struct ArachneSpacings {
     pub(in crate::project_slice) perimeter_spacing: i64,
+    /// `perimeter_flow.scaled_width()` — used by the top-surface
+    /// regeneration (`PerimeterGenerator.cpp:2179`).
+    pub(in crate::project_slice) perimeter_width: i64,
     pub(in crate::project_slice) ext_perimeter_width: i64,
     pub(in crate::project_slice) ext_perimeter_spacing: i64,
     pub(in crate::project_slice) ext_perimeter_spacing2: i64,
@@ -43,6 +46,7 @@ impl ArachneSpacings {
     pub(in crate::project_slice) fn new(
         scale: CoordinateScale,
         perimeter_spacing_mm: f32,
+        perimeter_width_mm: f32,
         ext_width_mm: f32,
         ext_spacing_mm: f32,
         solid_infill_spacing_mm: f32,
@@ -66,6 +70,7 @@ impl ArachneSpacings {
             })?;
         Ok(Self {
             perimeter_spacing: scaled(perimeter_spacing_mm)?,
+            perimeter_width: scaled(perimeter_width_mm)?,
             ext_perimeter_width: scaled(ext_width_mm)?,
             ext_perimeter_spacing: scaled(ext_spacing_mm)?,
             ext_perimeter_spacing2: spacing2,
@@ -74,7 +79,7 @@ impl ArachneSpacings {
     }
 }
 
-/// Generate one island's walls (`PerimeterGenerator.cpp:2111-2176`).
+/// Generate one island's walls (`PerimeterGenerator.cpp:2111-2248`).
 pub(in crate::project_slice) fn generate_surface_walls(
     surface: &RegionSurface,
     config: &ArachneRecordConfig,
@@ -82,6 +87,7 @@ pub(in crate::project_slice) fn generate_surface_walls(
     wall_loops: i32,
     layer_height: f64,
     scale: CoordinateScale,
+    top_surface: Option<&super::top_surface::TopSurfaceInputs<'_>>,
 ) -> Result<GeneratedSurfaceWalls, SliceError> {
     let (_, expolygon, _, _, _, extra_perimeters) = surface.as_parts();
     // 0-indexed loops for this island (`PerimeterGenerator.cpp:2113-2114`).
@@ -90,9 +96,20 @@ pub(in crate::project_slice) fn generate_surface_walls(
     if config.is_bottom_layer && config.only_one_wall_first_layer {
         loop_number = 0;
     }
-    // Orca: set the topmost layer to be one wall (`:2125-2127`); the
-    // top-surface regeneration below topmost layers stays typed-rejected.
+    // Orca: set the topmost layer to be one wall (`:2125-2127`).
     if config.is_topmost_layer && loop_number > 0 && config.only_one_wall_top {
+        loop_number = 0;
+    }
+    // `:2163`: the top-surface regeneration keeps the inner loops for
+    // non-top areas (the second pass below).
+    let inner_loop_number = if config.only_one_wall_top && top_surface.is_some() {
+        loop_number - 1
+    } else {
+        -1
+    };
+    // `:2165-2166`: the main pass generates a single wall when the feature
+    // is active on a non-topmost layer.
+    if config.only_one_wall_top && loop_number > 0 {
         loop_number = 0;
     }
     let outer_offset = if config.precise_outer_wall {
@@ -150,10 +167,28 @@ pub(in crate::project_slice) fn generate_surface_walls(
     })?;
     let infill_contour =
         union_ex(&generated.inner_contour, FillRule::NonZero).map_err(geometry_error)?;
-    Ok(GeneratedSurfaceWalls {
-        toolpaths: generated.toolpaths,
+    if inner_loop_number < 0 {
+        return Ok(GeneratedSurfaceWalls {
+            toolpaths: generated.toolpaths,
+            infill_contour,
+        });
+    }
+    // Top-surface regeneration (`PerimeterGenerator.cpp:2177-2247`): the
+    // main pass above emitted a single wall; the not-top areas regrow
+    // their inner walls in the dedicated module.
+    super::top_surface::regenerate(
+        generated.toolpaths,
         infill_contour,
-    })
+        top_surface.expect("inner_loop_number >= 0 implies top surface"),
+        config,
+        spacings,
+        &last,
+        wall_0_inset,
+        layer_height,
+        params,
+        scale,
+        inner_loop_number,
+    )
 }
 
 /// The infill boundary of one island (`PerimeterGenerator.cpp:2475-2531`).

@@ -68,7 +68,7 @@ fn config_with(
 }
 
 fn spacings() -> ArachneSpacings {
-    ArachneSpacings::new(SCALE, 0.385, 0.42, 0.39, 0.42).unwrap()
+    ArachneSpacings::new(SCALE, 0.385, 0.42, 0.42, 0.39, 0.42).unwrap()
 }
 
 #[test]
@@ -81,6 +81,7 @@ fn task22w12_generates_real_variable_width_walls_for_one_island() {
         3,
         0.16,
         SCALE,
+        None,
     )
     .unwrap();
 
@@ -104,6 +105,7 @@ fn task22w13_bottom_layer_single_wall_rule_resets_the_loop_count() {
         3,
         0.16,
         SCALE,
+        None,
     )
     .unwrap();
 
@@ -122,6 +124,7 @@ fn task22w14_topmost_layer_single_wall_rule_resets_the_loop_count() {
         3,
         0.16,
         SCALE,
+        None,
     )
     .unwrap();
 
@@ -146,6 +149,7 @@ fn task22w16_infill_boundary_applies_the_wall_overlap_percent() {
         3,
         0.16,
         SCALE,
+        None,
     )
     .unwrap();
     let boundary = crate::project_slice::perimeters::arachne::walls::surface_infill_boundary(
@@ -191,6 +195,7 @@ fn task22w17_infill_boundary_truncates_offsets_before_halving() {
     )];
     let spacings = ArachneSpacings {
         perimeter_spacing: 209269,
+        perimeter_width: 209269,
         ext_perimeter_width: 220000,
         ext_perimeter_spacing: 209269,
         ext_perimeter_spacing2: 209269,
