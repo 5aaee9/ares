@@ -137,10 +137,14 @@ pub(super) fn append(
                     start_position.as_ref(),
                     first_layer_bounds,
                 )?;
-                // Track the Z the start g-code left the nozzle at, mirroring
-                // `GCodeWriter::m_pos(2)` for the `change_layer`
-                // `will_move_z` gate (`GCode.cpp:5693`).
-                state.writer_z = Some(trailing_gcode_z(output));
+                // Upstream's writer does NOT know the Z after the start
+                // g-code (`GCode.cpp:3139-3140` calls
+                // `m_writer.set_current_position_clear(false)`), so
+                // `m_pos.z()` stays 0 and `will_move_z` fires for every
+                // layer-0 change (`GCode.cpp:5693`). Keep `writer_z` unset
+                // to mirror that — scanning the start g-code for a trailing
+                // Z would suppress the retract when the purge lines already
+                // sit at the first-layer Z.
                 // The brim split target (`loop.split_at(last_pos)`) uses
                 // the nozzle XY the start g-code left — track it in the
                 // live gcode coordinates.

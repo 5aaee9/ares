@@ -37,8 +37,10 @@ fn surface_type_detection_forwards_the_drilled_classic_allocation() {
 #[test]
 fn post_perimeter_boundary_rejects_out_of_scope_arachne_dispatch_typed() {
     // Arachne dispatch itself is enabled; the KSR configuration
-    // (`only_one_wall_top` on non-topmost layers) stays outside the
+    // (`detect_overhang_wall` on non-topmost layers) stays outside the
     // first-slice scope and fails closed at the scope gate.
+    // (`only_one_wall_top` is now implemented by the top-surface
+    // regeneration and no longer rejects.)
     let mut archive = KsrArchive::new();
     archive.replace_unique(
         CONFIG,
@@ -49,6 +51,6 @@ fn post_perimeter_boundary_rejects_out_of_scope_arachne_dispatch_typed() {
         prepare_post_layer_region_perimeters(&archive.bytes())
             .err()
             .unwrap(),
-        SliceError::UnsupportedProjectFeature("only_one_wall_top".to_owned())
+        SliceError::UnsupportedProjectFeature("detect_overhang_wall".to_owned())
     );
 }
