@@ -20,7 +20,8 @@ mod geometry;
 mod tests;
 
 pub(in crate::project_slice::gcode_emit) use geometry::convex_hull;
-use geometry::{closed_length, find_start_point, split_at_nearest};
+pub(in crate::project_slice::gcode_emit) use geometry::split_at_nearest;
+use geometry::{closed_length, find_start_point};
 
 pub(super) struct SkirtPlan {
     /// Closed loops in emission order — outermost first (`Print.cpp:2985`).

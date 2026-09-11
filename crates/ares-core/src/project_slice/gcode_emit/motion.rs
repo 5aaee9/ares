@@ -124,9 +124,47 @@ pub(super) fn emit_brim_loop(
     geometry: LayerGeometry<'_>,
     state: &mut EmitState,
 ) {
+    // `GCode::extrude_entity("brim")` dispatches to `extrude_loop`, which
+    // splits every non-perimeter loop at the point nearest the last
+    // position (`GCode.cpp:5771`). The projection foot truncates in plate
+    // coordinates, so split there and restore, exactly like the skirt
+    // (`GCode::generate_skirt` `set_origin(unscale(Point(0,0)))`).
+    let points = points.collect::<Vec<_>>();
+    if points.len() >= 2 {
+        let offset = (
+            (state.offset.0 / geometry.scale.factor()).round() as i64,
+            (state.offset.1 / geometry.scale.factor()).round() as i64,
+        );
+        let cursor = local_cursor(state, geometry);
+        let plate_target = Point::new(cursor.x() + offset.0, cursor.y() + offset.1);
+        let plate = points
+            .iter()
+            .map(|&(x, y)| Point::new(x + offset.0, y + offset.1))
+            .collect::<Vec<_>>();
+        let split = super::skirt::split_at_nearest(&plate, plate_target)
+            .into_iter()
+            .map(|point| (point.x() - offset.0, point.y() - offset.1));
+        path::emit(
+            output,
+            split,
+            PathProperties {
+                mm3_per_mm: flow.mm3_per_mm,
+                width: flow.width,
+                height: flow.height,
+                feature: "Brim",
+                is_perimeter: false,
+                end_clip: state.options.seam_gap,
+                fitting: &[],
+                slope: None,
+            },
+            geometry,
+            state,
+        );
+        return;
+    }
     path::emit(
         output,
-        points,
+        points.into_iter(),
         PathProperties {
             mm3_per_mm: flow.mm3_per_mm,
             width: flow.width,

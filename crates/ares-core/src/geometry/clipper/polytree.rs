@@ -326,13 +326,9 @@ pub(crate) fn union_contours(
             // root contour first, then recurse into its holes (nested rings
             // of the brim), with hole contours reversed to CCW — the
             // outside-in nesting order.
-            std::iter::once(contour).chain(holes).map(|polygon| {
-                let mut points = polygon.points().to_vec();
-                if points.len() > 2 && shoelace_area(&points) > 0.0 {
-                    points.reverse();
-                }
-                points
-            })
+            std::iter::once(contour)
+                .chain(holes)
+                .map(|polygon| polygon.points().to_vec())
         })
         .collect())
 }
