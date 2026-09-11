@@ -109,8 +109,11 @@ fn fill_component(
             .checked_add(expand)
             .ok_or(ClipperError::CoordinateOutOfRange)?,
     );
-    let width = ((maximum.x() - minimum.x()) as f64 / distance as f64).ceil() + 1.0;
-    let height = ((maximum.y() - minimum.y()) as f64 / distance as f64).ceil() + 1.0;
+    // Upstream `ceil(bb.size()(0) / distance) + 1.` divides coord_t by coord_t —
+    // integer division (ceil is a no-op on the truncated quotient), so the
+    // wave extent is floor(size/distance) + 1, not the float-ceil result.
+    let width = ((maximum.x() - minimum.x()) / distance) as f64 + 1.0;
+    let height = ((maximum.y() - minimum.y()) / distance) as f64 + 1.0;
     let mut polylines = make_gyroid_waves(
         params.z / scale.factor(),
         density,
@@ -125,6 +128,40 @@ fn fill_component(
     let mut clip = Vec::with_capacity(holes.len() + 1);
     clip.push(contour);
     clip.extend(holes);
+    if let Ok(path) = std::env::var("ARES_DUMP_GYROID_PRECLIP") {
+        use std::io::Write;
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
+            let _ = writeln!(file, "PRECLIP n={}", polylines.len());
+            for polyline in &polylines {
+                let _ = write!(file, "PL {}:", polyline.points().len());
+                for point in polyline.points() {
+                    let _ = write!(
+                        file,
+                        " ({},{})",
+                        scale.unscale(point.x()),
+                        scale.unscale(point.y())
+                    );
+                }
+                let _ = writeln!(file);
+            }
+            for polygon in &clip {
+                let _ = write!(file, "CLIP_CONTOUR:");
+                for point in polygon.points() {
+                    let _ = write!(
+                        file,
+                        " ({},{})",
+                        scale.unscale(point.x()),
+                        scale.unscale(point.y())
+                    );
+                }
+                let _ = writeln!(file);
+            }
+        }
+    }
     polylines = intersection_open_polylines(&polylines, &clip)?;
     let minimum_length = 0.8 * params.spacing / scale.factor();
     polylines.retain(|polyline| polyline_length(polyline) >= minimum_length);
