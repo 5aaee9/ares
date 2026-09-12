@@ -14,6 +14,12 @@ pub(in crate::project_slice::gcode_emit) struct EmitState {
     pub(in crate::project_slice::gcode_emit) y: f64,
     pub(in crate::project_slice::gcode_emit) e_position: f64,
     pub(in crate::project_slice::gcode_emit) offset: (f64, f64),
+    /// `GCode::point_to_gcode` (`GCode.cpp:8124-8127`) evaluates
+    /// `unscale(point) + m_origin - extruder_offset` strictly left-to-right;
+    /// folding the extruder offset into `offset` first rounds one ULP
+    /// differently across 0.0005 formatting boundaries (mHlqqz X149.029).
+    pub(in crate::project_slice::gcode_emit) origin: (f64, f64),
+    pub(in crate::project_slice::gcode_emit) extruder_offset: (f64, f64),
     pub(in crate::project_slice::gcode_emit) scale_factor: f64,
     pub(in crate::project_slice::gcode_emit) travel_feedrate: f64,
     pub(in crate::project_slice::gcode_emit) extrusion_feedrate: f64,

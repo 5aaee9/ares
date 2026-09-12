@@ -31,8 +31,8 @@ pub(super) fn emit(emission: Emission<'_, '_>) {
     let wipe_points = local_points
         .iter()
         .map(|&(x, y)| arc::Point {
-            x: x + state.offset.0,
-            y: y + state.offset.1,
+            x: x + state.origin.0 - state.extruder_offset.0,
+            y: y + state.origin.1 - state.extruder_offset.1,
         })
         .collect::<Vec<_>>();
     fan::update_for_constant_path(output, properties, state);

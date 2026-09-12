@@ -56,15 +56,15 @@ pub(super) fn emit(command: Emission<'_>) {
     }
     state.extrusion_feedrate = last_feedrate;
     state.wipe_start = wipe_points.last().map(|&(x, y)| arc::Point {
-        x: x + state.offset.0,
-        y: y + state.offset.1,
+        x: x + state.origin.0 - state.extruder_offset.0,
+        y: y + state.origin.1 - state.extruder_offset.1,
     });
     state.wipe_path = wipe_points
         .iter()
         .rev()
         .map(|&(x, y)| arc::Point {
-            x: x + state.offset.0,
-            y: y + state.offset.1,
+            x: x + state.origin.0 - state.extruder_offset.0,
+            y: y + state.origin.1 - state.extruder_offset.1,
         })
         .collect();
     if let Ok(path) = std::env::var("ARES_DUMP_PATH") {

@@ -287,8 +287,8 @@ pub(in crate::project_slice::gcode_emit::motion) fn scaled_position(
 
 fn unscaled_position(point: (i64, i64), state: &EmitState) -> arc::Point {
     arc::Point {
-        x: point.0 as f64 * state.scale_factor + state.offset.0,
-        y: point.1 as f64 * state.scale_factor + state.offset.1,
+        x: point.0 as f64 * state.scale_factor + state.origin.0 - state.extruder_offset.0,
+        y: point.1 as f64 * state.scale_factor + state.origin.1 - state.extruder_offset.1,
     }
 }
 

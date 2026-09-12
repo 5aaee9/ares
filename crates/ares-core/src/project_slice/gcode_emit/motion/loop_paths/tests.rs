@@ -27,6 +27,7 @@ fn wipe_before_external_uses_the_source_rotated_inner_point() {
     }];
     let mut state = EmitState {
         offset: (110.0, 110.0),
+        origin: (110.0, 110.0),
         travel_feedrate: 9_000.0,
         options: super::super::MotionOptions {
             wipe_before_external_loop: true,

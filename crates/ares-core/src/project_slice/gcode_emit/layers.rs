@@ -122,6 +122,7 @@ pub(super) fn append(
             .identity();
         if let Some((center_x, center_y)) = footprint::object_center(traversal, source_object_index)
         {
+            state.origin = (center_x, center_y);
             state.offset = (center_x - extruder_offset.0, center_y - extruder_offset.1);
         }
         let labels = object::ObjectLabels::from_traversal(traversal, object_index);

@@ -148,8 +148,8 @@ fn append_wipe_before_external(
         + sine * (base_x - current.x as f64)
         + cosine * (base_y - current.y as f64);
     let point = crate::geometry::Point::new(x.round() as i64, y.round() as i64);
-    let x = geometry.scale.unscale(point.x()) + state.offset.0;
-    let y = geometry.scale.unscale(point.y()) + state.offset.1;
+    let x = geometry.scale.unscale(point.x()) + state.origin.0 - state.extruder_offset.0;
+    let y = geometry.scale.unscale(point.y()) + state.origin.1 - state.extruder_offset.1;
     // Orca routes this hop through `travel_to` inside the fake
     // extrusion path (`GCode.cpp:5884-5893`), so the travel-class
     // accel/jerk setup fires for it exactly like any other path-start
@@ -210,8 +210,8 @@ fn append_wipe_before_external(
     state.current_feedrate = state.travel_feedrate;
     state.last_scaled_position = Some((current.x, current.y));
     state.pending_wipe_before_external_target = Some(super::arc::Point {
-        x: geometry.scale.unscale(current.x) + state.offset.0,
-        y: geometry.scale.unscale(current.y) + state.offset.1,
+        x: geometry.scale.unscale(current.x) + state.origin.0 - state.extruder_offset.0,
+        y: geometry.scale.unscale(current.y) + state.origin.1 - state.extruder_offset.1,
     });
 }
 
@@ -269,8 +269,8 @@ fn append_inward_move(
         ),
         state.options.nozzle_diameter / geometry.scale.factor(),
     );
-    let x = geometry.scale.unscale(point.x()) + state.offset.0;
-    let y = geometry.scale.unscale(point.y()) + state.offset.1;
+    let x = geometry.scale.unscale(point.x()) + state.origin.0 - state.extruder_offset.0;
+    let y = geometry.scale.unscale(point.y()) + state.origin.1 - state.extruder_offset.1;
     output.extend_from_slice(format!("G1 X{} Y{}\n", format_axis(x), format_axis(y)).as_bytes());
     state.x = x;
     state.y = y;

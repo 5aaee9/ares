@@ -122,7 +122,12 @@ pub(super) fn emit(
         || {
             local_points
                 .iter()
-                .map(|&(x, y)| (x + state.offset.0, y + state.offset.1))
+                .map(|&(x, y)| {
+                    (
+                        x + state.origin.0 - state.extruder_offset.0,
+                        y + state.origin.1 - state.extruder_offset.1,
+                    )
+                })
                 .collect::<Vec<_>>()
         },
         |points| {
@@ -130,8 +135,12 @@ pub(super) fn emit(
                 .iter()
                 .map(|point| {
                     (
-                        travel_emit::quantize_axis(point.x + state.offset.0),
-                        travel_emit::quantize_axis(point.y + state.offset.1),
+                        travel_emit::quantize_axis(
+                            point.x + state.origin.0 - state.extruder_offset.0,
+                        ),
+                        travel_emit::quantize_axis(
+                            point.y + state.origin.1 - state.extruder_offset.1,
+                        ),
                     )
                 })
                 .collect::<Vec<_>>()
@@ -141,8 +150,8 @@ pub(super) fn emit(
     let Some(&(first_local_x, first_local_y)) = local_points.first() else {
         return;
     };
-    let first_x = first_local_x + state.offset.0;
-    let first_y = first_local_y + state.offset.1;
+    let first_x = first_local_x + state.origin.0 - state.extruder_offset.0;
+    let first_y = first_local_y + state.origin.1 - state.extruder_offset.1;
     start_travel::emit(
         output,
         state,
@@ -223,8 +232,8 @@ pub(super) fn emit(
         let wipe_points = local_points
             .iter()
             .map(|&(x, y)| arc::Point {
-                x: x + state.offset.0,
-                y: y + state.offset.1,
+                x: x + state.origin.0 - state.extruder_offset.0,
+                y: y + state.origin.1 - state.extruder_offset.1,
             })
             .collect::<Vec<_>>();
         fan::update_for_constant_path(output, properties, state);
