@@ -67,10 +67,15 @@ pub(super) fn route(
     } = request;
     let boundary = boundary?;
     let scale = geometry.scale;
+    // The mm cursor round-trips through `unscale(int) + offset`, which lands
+    // a few ULPs below the exact value; a truncating cast would drop one
+    // lattice unit and skew every route waypoint (qVMcEP X3946461 vs
+    // upstream's exact X3946462). Upstream routes on `m_last_pos` ints, so
+    // round the conversion back to the originating integer.
     let to_scaled = |point: arc::Point| -> Option<crate::geometry::Point> {
         Some(crate::geometry::Point::new(
-            scale.checked_scale(point.x - offset.0)?,
-            scale.checked_scale(point.y - offset.1)?,
+            scale.checked_scale_rounded(point.x - offset.0)?,
+            scale.checked_scale_rounded(point.y - offset.1)?,
         ))
     };
     let scaled_start = to_scaled(start)?;

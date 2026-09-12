@@ -96,7 +96,12 @@ pub(in crate::project_slice::gcode_emit::motion) fn emit_pending(
     let raised_z = state.layer_z + state.options.z_hop;
     let dx = target.x - state.x;
     let dy = target.y - state.y;
-    let travel_distance = dx.hypot(dy);
+    // `GCodeWriter::travel_to_xyz` measures the XY distance with Eigen
+    // `Vec2d::norm()` (`sqrt(dx*dx + dy*dy)`, `GCodeWriter.cpp:718`), not
+    // `hypot`; the spiral points land on 6-significant-digit rounding
+    // boundaries where the extra `hypot` precision flips the last digit
+    // (qVMcEP X91.7173 vs upstream X91.7174).
+    let travel_distance = (dx * dx + dy * dy).sqrt();
     let emitted = match mode {
         LiftMode::Normal => {
             let feedrate = z_feedrate(state);
@@ -221,7 +226,10 @@ fn append_spiral(output: &mut Vec<u8>, state: &EmitState, raised_z: f64, i: f64,
         .clamp(4.0, 16.0) as usize;
     let center_x = state.x + i;
     let center_y = state.y + j;
-    let radius = i.hypot(j);
+    // `_spiral_travel_to_z` derives the circle radius from
+    // `ij_offset.norm()` (`GCodeWriter.cpp:876`) — `sqrt(i*i + j*j)` with
+    // its double rounding, not `hypot`.
+    let radius = (i * i + j * j).sqrt();
     let start_angle = (state.y - center_y).atan2(state.x - center_x);
     for index in 1..segments {
         let progress = index as f64 / segments as f64;

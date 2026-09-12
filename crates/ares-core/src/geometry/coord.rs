@@ -57,6 +57,20 @@ impl CoordinateScale {
         }
     }
 
+    /// Like `checked_scale`, but rounding to the nearest lattice unit. Used
+    /// where an mm value round-trips back to the integer it came from
+    /// (`unscale(int) + offset` loses a unit to a truncating cast).
+    pub(crate) fn checked_scale_rounded(self, coordinate: f64) -> Option<Coord> {
+        let quotient = coordinate / self.factor();
+        if quotient.is_finite()
+            && (MIN_COORD_QUOTIENT..MAX_COORD_QUOTIENT_EXCLUSIVE).contains(&quotient)
+        {
+            Some(quotient.round() as Coord)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn unscale(self, coordinate: Coord) -> f64 {
         coordinate as f64 * self.factor()
     }
