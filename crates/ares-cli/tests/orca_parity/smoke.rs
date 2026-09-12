@@ -361,7 +361,7 @@ fn write_summary(outcomes: &[parity::ParityOutcome]) {
         .filter(|outcome| outcome.status == "PASS")
         .count();
     let mut summary = format!(
-        "# OrcaSlicer printer smoke summary\n\n{} of {} printers pass the semantic parity comparison (classic wall generator baseline; cube model).\n\n> NOTE: timing (M73/model-printing-time) is compared with `compare_ignoring_time` until the GCodeProcessor motion planner reaches Orca parity; timing deltas are therefore not reflected in the divergences below.\n\n| status | printer | first divergence |\n|---|---|---|\n",
+        "# OrcaSlicer printer smoke summary\n\n{} of {} printers pass the strict ordered-byte comparison (generator identity/timestamp lines normalized; classic wall generator baseline; cube model).\n\nStatuses: `PASS` (normalized byte equality), `DIVERGENT` (first byte difference), `ORCA_ERROR` (the upstream OrcaSlicer 2.4.2 reference binary itself failed, so no reference stream exists), `VENDOR_INCOMPLETE` (the vendor profile tree does not ship the machine's referenced default process preset), `ARES_ERROR` (Ares failed to load or slice the case).\n\n| status | printer | first divergence |\n|---|---|---|\n",
         passed,
         outcomes.len()
     );

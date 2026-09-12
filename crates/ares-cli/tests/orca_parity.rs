@@ -88,6 +88,31 @@ pub(crate) fn divergence(label: &str, difference: String) -> ParityOutcome {
 }
 
 pub(crate) fn ares_error(label: &str, error: String) -> ParityOutcome {
+    // The upstream OrcaSlicer 2.4.2 binary itself failed (crash or nonzero
+    // exit) while producing the reference stream; Ares was never invoked.
+    if error.starts_with("Export/Process: unsuccessful Orca process")
+        || error.starts_with("Slice/Process: unsuccessful Orca process")
+    {
+        return ParityOutcome {
+            label: label.to_owned(),
+            status: "ORCA_ERROR",
+            detail: error,
+            artifacts: None,
+        };
+    }
+    // The vendor tree itself lacks the machine's referenced default preset
+    // (and no compatible preset exists), so no reference producer input can
+    // be assembled for this printer.
+    if error.contains("default preset") && error.contains("not found")
+        || error.contains("no compatible preset")
+    {
+        return ParityOutcome {
+            label: label.to_owned(),
+            status: "VENDOR_INCOMPLETE",
+            detail: error,
+            artifacts: None,
+        };
+    }
     ParityOutcome {
         label: label.to_owned(),
         status: "ARES_ERROR",
