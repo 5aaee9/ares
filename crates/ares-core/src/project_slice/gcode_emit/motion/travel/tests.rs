@@ -81,6 +81,31 @@ fn deferred_bottom_only_lift_uses_the_target_layer_index() {
 }
 
 #[test]
+fn layer_change_hop_cannot_raise_above_destination_is_dropped() {
+    // `GCodeWriter::travel_to_xyz` (`GCodeWriter.cpp:701-710`): a deferred
+    // `m_to_lift` only raises the travel destination while
+    // `m_to_lift + m_pos(2) > point(2)`; when the layer step already reaches
+    // the hop height (z_hop == layer height, e.g. LH Stinger), the hop is
+    // dropped and the travel moves straight to the layer z.
+    let mut state = EmitState {
+        layer_z: 0.4,
+        pending_layer_retract: true,
+        options: MotionOptions {
+            retraction_length: 1.0,
+            z_hop: 0.2,
+            z_hop_type: crate::ZHopType::Auto,
+            ..MotionOptions::default()
+        },
+        ..EmitState::default()
+    };
+
+    flush_pending_retract_lift(&mut Vec::new(), &mut state, 0.2);
+
+    assert_eq!(state.pending_lift, None);
+    assert!(state.retracted);
+}
+
+#[test]
 fn slope_type_schedules_a_slope_lift() {
     let mut state = EmitState {
         layer_z: 0.4,

@@ -88,6 +88,11 @@ fn cube_model() -> PathBuf {
 /// Single-printer smoke case used to develop the harness and record the
 /// first divergences on a plain Marlin i3 profile.
 #[test]
+fn orca_parity_lh_stinger_smoke() {
+    assert_printer_smoke("LH", "LH Stinger 0.4 nozzle");
+}
+
+#[test]
 fn orca_parity_kobra_s1_max_025_smoke() {
     assert_printer_smoke("Anycubic", "Anycubic Kobra S1 Max 0.25 nozzle");
 }

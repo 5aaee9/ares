@@ -200,7 +200,14 @@ pub(super) fn emit(output: &mut Vec<u8>, state: &mut EmitState, request: Request
                 );
             }
         } else if layer_change_travel && state.retracted {
-            if state.options.z_hop > 0.0 && retraction::uses_sloped_lift(state.options.z_hop_type) {
+            // A sloped/spiral hop only replaces the z word when its lift is
+            // actually in play; a hop dropped by the layer-step gate
+            // (`lift::schedule_at`, `GCodeWriter.cpp:701-710`) must fall
+            // through to the plain combined xyz travel to the layer z.
+            if state.options.z_hop > 0.0
+                && retraction::uses_sloped_lift(state.options.z_hop_type)
+                && state.lifted
+            {
                 travel_emit::xy(output, travel_x, travel_y, state.travel_feedrate);
             } else if state.lifted {
                 output.extend_from_slice(
