@@ -154,14 +154,6 @@ impl Estimate {
                 eligible.then_some((id, cumulative))
             })
             .collect::<Vec<_>>();
-        if let Ok(path) = std::env::var("ARES_DUMP_G1_TIMES") {
-            use std::fmt::Write as _;
-            let mut dump = String::new();
-            for (id, time) in &cache {
-                let _ = writeln!(dump, "G1T {id} {time:.9}");
-            }
-            std::fs::write(path, dump).ok();
-        }
         let mut elapsed = vec![None; lines.len() + 1];
         let mut cache_index = 0;
         let mut exported_g1_lines = 0;

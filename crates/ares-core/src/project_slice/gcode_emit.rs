@@ -156,9 +156,6 @@ pub(super) fn emit(
         let mut layers = output.split_off(fan_layers_start);
         let tail = layers.split_off(fan_layers_end - fan_layers_start);
         let text = String::from_utf8(layers).expect("generated G-code is UTF-8");
-        if std::env::var_os("ARES_DUMP_FANMOVER").is_some() {
-            std::fs::write("/tmp/fanmover-input.gcode", &text).ok();
-        }
         let flushed = mover.process_gcode(&text, true);
         output.extend(flushed.into_bytes());
         output.extend(tail);
