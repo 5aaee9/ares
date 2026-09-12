@@ -23,15 +23,6 @@ pub(super) fn schedule_at(state: &mut EmitState, layer_change: bool, writer_z: f
     if state.options.z_hop <= 0.0 || !is_allowed_at(state, writer_z) {
         return;
     }
-    // `GCodeWriter::travel_to_xyz` (`GCodeWriter.cpp:701-710`): the deferred
-    // hop only raises the travel destination while `m_to_lift + m_pos(2) >
-    // point(2)`. At a layer change the writer still sits at the previous
-    // layer's z while the travel targets the new layer z, so a hop that
-    // cannot lift above that destination is dropped entirely (no spiral,
-    // slope or normal lift — the travel is a plain move to the layer z).
-    if layer_change && writer_z + state.options.z_hop <= state.layer_z {
-        return;
-    }
     state.pending_lift = Some(mode_for(state, layer_change));
 }
 
@@ -102,17 +93,6 @@ pub(in crate::project_slice::gcode_emit::motion) fn emit_pending(
     let Some(mode) = state.pending_lift.take() else {
         return false;
     };
-    // `GCodeWriter::travel_to_xyz` (`GCodeWriter.cpp:701-710`): a deferred
-    // hop raises the travel destination only while `m_to_lift + m_pos(2) >
-    // point(2)`. A layer-change deferral scheduled before the layer z
-    // advanced must re-evaluate against the travel's destination layer z
-    // here; when the layer step already reaches the hop height (the
-    // writer's physical z plus the hop cannot exceed the destination),
-    // the hop is dropped and the travel stays a plain move to the layer z.
-    let physical_z = state.writer_z.unwrap_or(state.layer_z);
-    if physical_z + state.options.z_hop <= state.layer_z {
-        return false;
-    }
     let raised_z = state.layer_z + state.options.z_hop;
     let dx = target.x - state.x;
     let dy = target.y - state.y;
@@ -225,6 +205,19 @@ pub(super) fn append_spiral_vase(output: &mut Vec<u8>, state: &mut EmitState) {
 }
 
 fn append_spiral(output: &mut Vec<u8>, state: &EmitState, raised_z: f64, i: f64, j: f64) {
+    if std::env::var_os("ARES_DEBUG_SPIRAL").is_some() {
+        eprintln!(
+            "SPIRAL layer_z={} raised={} hop={} writer_z={:?} source_layer_z={} retracted={} lifted={} pending={:?}",
+            state.layer_z,
+            raised_z,
+            state.options.z_hop,
+            state.writer_z,
+            state.source_layer_z,
+            state.retracted,
+            state.lifted,
+            state.pending_lift
+        );
+    }
     if state.options.enable_arc_fitting {
         output.extend_from_slice(b"G17\n");
         output.extend_from_slice(

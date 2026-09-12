@@ -217,9 +217,6 @@ pub(super) fn append(
                 && !state.lifted
                 && state.pending_lift.is_none();
             motion::flush_pending_retract_wipe(output, state);
-            if layer_retract_pending {
-                motion::defer_layer_change_lift(state);
-            }
             // Pending object-end labels flush after the layer-change
             // retract/wipe, before the layer-change gcode
             // (`GCode.cpp:5699` `change_layer`).
@@ -263,6 +260,13 @@ pub(super) fn append(
             state.layer_z = f64::from(layer_z);
             state.source_layer_z = precise_layer_z;
             state.layer_index = layer_index;
+            if layer_retract_pending {
+                // `change_layer` increments `m_layer_index` BEFORE the
+                // change-layer retract (`GCode.cpp:5690-5696`), so the
+                // `retract_lift_enforce` bottom/top gate evaluates at the
+                // NEW layer index — defer only after the index advanced.
+                motion::defer_layer_change_lift(state);
+            }
             motion::flush_pending_retract_lift(output, state, previous_layer_z);
             motion::begin_layer(
                 output,

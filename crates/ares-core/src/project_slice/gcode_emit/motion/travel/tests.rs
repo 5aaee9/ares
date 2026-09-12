@@ -81,25 +81,29 @@ fn deferred_bottom_only_lift_uses_the_target_layer_index() {
 }
 
 #[test]
-fn layer_change_hop_cannot_raise_above_destination_is_dropped() {
-    // `GCodeWriter::travel_to_xyz` (`GCodeWriter.cpp:701-710`): a deferred
-    // `m_to_lift` only raises the travel destination while
-    // `m_to_lift + m_pos(2) > point(2)`; when the layer step already reaches
-    // the hop height (z_hop == layer height, e.g. LH Stinger), the hop is
-    // dropped and the travel moves straight to the layer z.
+fn layer_change_top_and_bottom_enforce_uses_the_new_layer_index() {
+    // `change_layer` increments `m_layer_index` BEFORE the change-layer
+    // retract (`GCode.cpp:5690-5696`), so `retract_lift_enforce =
+    // Top and Bottom` never satisfies its bottom clause at a layer change
+    // (the new index is never 0) unless the last role was top infill
+    // (`GCode.cpp:7682-7698`). LH Stinger (z_hop == layer step) relies on
+    // this: no lift is deferred and the layer travel stays a plain move.
     let mut state = EmitState {
         layer_z: 0.4,
-        pending_layer_retract: true,
+        writer_z: Some(0.2),
+        layer_index: 1,
         options: MotionOptions {
             retraction_length: 1.0,
             z_hop: 0.2,
             z_hop_type: crate::ZHopType::Auto,
+            retract_lift_enforce: crate::RetractLiftEnforce::TopAndBottom,
             ..MotionOptions::default()
         },
         ..EmitState::default()
     };
+    let mut output = Vec::new();
 
-    flush_pending_retract_lift(&mut Vec::new(), &mut state, 0.2);
+    retract_and_lift(&mut output, &mut state);
 
     assert_eq!(state.pending_lift, None);
     assert!(state.retracted);
