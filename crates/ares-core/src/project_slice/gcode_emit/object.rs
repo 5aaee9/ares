@@ -48,11 +48,18 @@ impl ObjectLabels {
         let bitset = 1_u64.checked_shl(position as u32)?;
         let (exclude_start, exclude_end) =
             super::footprint::in_print_labels(traversal, object_index);
+        let settings = &traversal.resolved.views.full;
+        let flavor = settings.printer.gcode.gcode_flavor;
+        // `set_object_info` only runs when the exclude-object labeling is
+        // armed (`GCode.cpp:2697`); otherwise `PrintObject::m_id` is never
+        // assigned and every `; printing object ... id:` stays 0
+        // (`GCode.cpp:5349-5352` reads `print_object.get_id()`).
+        let ids_assigned = super::footprint::EXCLUDE_FLAVORS.contains(&flavor)
+            && settings.process.print.exclude_object.0
+            && !super::tags::Tags::of(traversal).is_bbl();
         Some(Self {
             name: object.name().to_owned(),
-            // `PrintObject::get_id()` is the sequential print-object index,
-            // not the 3MF mesh id (`GCode.cpp:5349-5352`).
-            object_id: object_index as u32,
+            object_id: ids_assigned.then_some(object_index as u32).unwrap_or(0),
             copy_id: instance.instance_id(),
             label_id: instance.loaded_label_id(),
             encoded_labels: encode_base64(bitset.to_le_bytes()),

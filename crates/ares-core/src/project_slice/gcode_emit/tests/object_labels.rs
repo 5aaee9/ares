@@ -130,7 +130,9 @@ async fn multi_object_project_uses_each_objects_identity() {
     let output = std::str::from_utf8(&output).unwrap();
 
     assert!(output.contains("; printing object ksr_fdmtest_v4.drc id:0 copy 0\n"));
-    assert!(output.contains("; printing object ksr_fdmtest_v4-copy.drc id:1 copy 0\n"));
+    // `set_object_info` never runs for BBL printers (`GCode.cpp:8075-8077`), so
+    // `PrintObject::m_id` stays 0 for every object (`GCode.cpp:5349-5352`).
+    assert!(output.contains("; printing object ksr_fdmtest_v4-copy.drc id:0 copy 0\n"));
 }
 #[tokio::test]
 async fn gcode_label_objects_false_suppresses_comments_and_bbl_labels() {

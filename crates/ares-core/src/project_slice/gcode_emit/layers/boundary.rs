@@ -55,8 +55,9 @@ pub(super) fn append<'a>(
         first_layer_bounds,
     }: Boundary<'a>,
     layer_index: usize,
-    precise_layer_z: &mut f64,
-    previous_layer_z: &mut f32,
+    previous_layer_z: f32,
+    layer_z: f32,
+    layer_height: f32,
     second_layer_done: &mut bool,
     bed_cache: i32,
 ) -> Result<BoundaryAdvance<'a>, SliceError> {
@@ -64,22 +65,12 @@ pub(super) fn append<'a>(
     let tags = state.tags;
     output.extend_from_slice(tags.layer_change().as_bytes());
     output.push(b'\n');
-    let record_layer_height = traversal
-        .objects
-        .first()
-        .and_then(|object| object.records.get(layer_index))
-        .and_then(|record| record.as_ref())
-        .map_or(0.0, |record| record.layer_height);
-    *precise_layer_z += record_layer_height;
-    let layer_z = *precise_layer_z as f32;
-    let layer_height = layer_z - *previous_layer_z;
     // Upstream's writer z at the layer-change retract is still the
     // previous layer's z (`change_layer` does not move z); the
     // start-gcode z remains authoritative for the first layer.
     if layer_index > 0 {
-        state.writer_z = Some(f64::from(*previous_layer_z));
+        state.writer_z = Some(f64::from(previous_layer_z));
     }
-    *previous_layer_z = layer_z;
     let header = format!(
         "{}\n{}\n",
         tags.z(&format_processor_float(f64::from(layer_z))),
@@ -168,7 +159,7 @@ pub(super) fn append<'a>(
     let previous_state_layer_z = state.layer_z;
     advance_for_layer(
         state,
-        *precise_layer_z,
+        f64::from(layer_z),
         layer_z,
         layer_index,
         layer_retract_pending,

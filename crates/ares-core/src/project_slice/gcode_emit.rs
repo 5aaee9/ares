@@ -187,6 +187,36 @@ pub(super) fn emit(
 /// of one source object are separate traversal objects here, but one
 /// PrintObject upstream — their islands union into one boundary. The
 /// cache holds one union per layer_index (all copies share the layout).
+fn layer_boundary_slices_rc(
+    traversal: &PreparedPostClassicTraversal,
+    object_index: usize,
+    layer_index: usize,
+    cache: &mut std::collections::HashMap<usize, std::rc::Rc<[ExPolygon]>>,
+) -> std::rc::Rc<[ExPolygon]> {
+    let Some(record) = traversal.objects[object_index]
+        .records
+        .get(layer_index)
+        .and_then(Option::as_ref)
+    else {
+        return std::rc::Rc::from(
+            traversal.objects[object_index]
+                .slices(layer_index)
+                .unwrap_or(&[]),
+        );
+    };
+    let _ = record;
+    cache
+        .entry(layer_index)
+        .or_insert_with(|| {
+            let mut all: Vec<ExPolygon> = Vec::new();
+            for slices in traversal.objects[object_index].occurrence_slices(layer_index) {
+                all.extend(slices.iter().cloned());
+            }
+            std::rc::Rc::from(crate::geometry::union_expolygons(&all, &[]).unwrap_or_default())
+        })
+        .clone()
+}
+
 fn layer_boundary_slices<'a>(
     traversal: &'a PreparedPostClassicTraversal,
     object_index: usize,
