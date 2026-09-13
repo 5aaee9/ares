@@ -82,11 +82,35 @@ fn append(
             ]),
         );
     }
-    let physical_extruder = runtime
-        .physical_extruder_map
-        .0
-        .first()
-        .map_or(0, |value| value.0);
+    // `ToolOrdering::cal_most_used_extruder` (`ToolOrdering.cpp:955-981`):
+    // the most-used PHYSICAL extruder is `filament_map[f] - 1` over the
+    // used filaments, counted once per layer; ties resolve to the HIGHEST
+    // index. With every configured filament used each layer, each distinct
+    // physical extruder weighs one layer-count, so the tie-to-highest rule
+    // decides. The placeholder id is then
+    // `physical_extruder_map.get_at(most_used)` (`GCode.cpp:5162`).
+    let full = &traversal.resolved.views.full;
+    let map = &full.project.gcode.filament_map.0;
+    let most_used = map
+        .iter()
+        .filter(|entry| entry.0 >= 1)
+        .map(|entry| (entry.0 - 1) as usize)
+        .max();
+    let physical_extruder = match most_used {
+        Some(index) => runtime
+            .physical_extruder_map
+            .0
+            .get(index)
+            .or_else(|| runtime.physical_extruder_map.0.first())
+            .map_or(0, |value| value.0),
+        // An all-zero/empty map degenerates to the first physical entry
+        // (`physical_extruder_map.get_at(0)`).
+        None => runtime
+            .physical_extruder_map
+            .0
+            .first()
+            .map_or(0, |value| value.0),
+    };
     config.insert(
         "most_used_physical_extruder_id",
         value::Value::number(physical_extruder as f64),

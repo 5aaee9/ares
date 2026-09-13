@@ -30,6 +30,9 @@ mod template;
 #[cfg(test)]
 mod tests;
 mod timelapse;
+
+#[cfg(test)]
+mod timelapse_tests;
 mod value;
 use crate::{GenerationMetadata, SliceError};
 
