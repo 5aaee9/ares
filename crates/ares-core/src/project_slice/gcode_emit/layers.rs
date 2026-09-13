@@ -275,6 +275,11 @@ pub(super) fn append(
                 state.origin = (center_x, center_y);
                 state.offset = (center_x - extruder_offset.0, center_y - extruder_offset.1);
             }
+            // Upstream re-initializes the avoid-crossing boundaries for
+            // every instance's layer (`init_layer(*m_layer)` per
+            // `instance_to_print`, `GCode.cpp:5343-5345`); drop the cached
+            // boundary so each entry rebuilds it from its own slices.
+            state.avoid_boundary = None;
             if object_index == 0
                 && layer_index == 0
                 && let Some(plan) = &brim
