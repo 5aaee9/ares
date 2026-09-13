@@ -25,18 +25,22 @@ pub(super) fn append_and_track(
     state: &mut super::motion::EmitState,
     context: Context<'_>,
 ) -> Result<(), SliceError> {
-    if let Some(z) = append(
+    if let Some(last_z) = append(
         output,
         context.traversal,
         context.layer,
         context.metadata,
         context.first_layer_bounds,
     )? {
-        state.lifted = z > context.layer.z + f64::EPSILON;
-        state.template_lifted = state.lifted;
+        if let Some(z) = last_z {
+            state.lifted = z > context.layer.z + f64::EPSILON;
+            state.template_lifted = state.lifted;
+        }
         // The timelapse g-code parks the head; upstream marks the writer
-        // position unclear (`GCode.cpp:5171-5178`) so the next travel takes
-        // the separate first-position form.
+        // position unclear whenever the template is non-empty
+        // (`GCode.cpp:5171-5178` runs on `!timelapse_gcode.empty()`, not on
+        // a detected Z motion) so the next travel takes the separate
+        // first-position form.
         state.positioned = false;
     }
     Ok(())
@@ -62,7 +66,7 @@ fn append(
     layer: TimelapseLayer,
     metadata: GenerationMetadata,
     first_layer_bounds: Option<footprint::FirstLayerBounds>,
-) -> Result<Option<f64>, SliceError> {
+) -> Result<Option<Option<f64>>, SliceError> {
     let runtime = &traversal.resolved.views.runtime_gcode;
     let source = &runtime.time_lapse_gcode.0;
     if source.is_empty() {
@@ -136,7 +140,9 @@ fn append(
     let last_z = last_motion_z(&rendered);
     output.extend_from_slice(rendered.as_bytes());
     output.push(b'\n');
-    Ok(last_z)
+    // Outer `Some` = the template rendered and emitted (position now
+    // unclear); inner `Some` = the rendered g-code ended on a Z motion.
+    Ok(Some(last_z))
 }
 
 fn last_motion_z(gcode: &str) -> Option<f64> {
