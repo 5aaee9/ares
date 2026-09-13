@@ -50,6 +50,10 @@ fn load_stream(path: &std::path::Path, count_ids: bool) -> Result<Stream, String
             total = Some(parse_dhms(rest)?);
             continue;
         }
+        if let Some(rest) = line.strip_prefix("; estimated printing time (normal mode) = ") {
+            total = Some(parse_dhms(rest)?);
+            continue;
+        }
         if let Some((_, rest)) = line
             .strip_prefix("; model printing time: ")
             .and_then(|rest| rest.split_once("; total estimated time: "))
