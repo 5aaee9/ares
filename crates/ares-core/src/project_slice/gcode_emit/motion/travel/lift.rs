@@ -3,6 +3,9 @@ use super::super::{
     format::{axis as format_axis, offset as format_offset, z as format_z},
 };
 
+#[cfg(test)]
+mod tests;
+
 pub(super) fn schedule(state: &mut EmitState, layer_change: bool) {
     schedule_at(state, layer_change, state.layer_z);
 }
@@ -164,10 +167,13 @@ pub(super) fn append_eager(output: &mut Vec<u8>, state: &mut EmitState) {
     let raised_z = state.layer_z + state.options.z_hop;
     // `GCodeWriter::eager_lift`: the spiral form requires a known-clear
     // position; an unknown position (right after the start g-code) falls
-    // back to the normal Z-only lift.
+    // back to the normal Z-only lift. `process_layer` maps Auto, Spiral AND
+    // Slope hop types onto SpiralLift for the layer-chunk retract
+    // (`GCode.cpp:4657-4660`), so the BBL eager layer-start lift takes the
+    // spiral form for all three.
     if matches!(
         state.options.z_hop_type,
-        crate::ZHopType::Spiral | crate::ZHopType::Auto
+        crate::ZHopType::Spiral | crate::ZHopType::Auto | crate::ZHopType::Slope
     ) && state.options.travel_slope_radians > 0.0
         && state.positioned
     {
