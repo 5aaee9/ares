@@ -201,6 +201,17 @@ impl Estimate {
                 elapsed[index + 1] = Some(cache[cache_index].1);
             }
         }
+        // Diagnostic backing for the committed `m73_profile` parity harness
+        // (`ares-cli/tests/orca_parity/m73_profile.rs`): dumps the
+        // `g1_times_cache` pairs `<id> <cumulative-seconds>`. No effect on
+        // slicing unless `ARES_DUMP_ELAPSED` names an output path.
+        if let Ok(path) = std::env::var("ARES_DUMP_ELAPSED") {
+            use std::io::Write;
+            let mut out = std::fs::File::create(&path).unwrap();
+            for (id, cumulative) in &cache {
+                writeln!(out, "{id} {cumulative:.6}").unwrap();
+            }
+        }
         // `prepare_time += block_time` accumulates in f32
         // (`GCodeProcessor.cpp:475-476`), so the exported trailer matches
         // upstream's float rounding at the sixth decimal.

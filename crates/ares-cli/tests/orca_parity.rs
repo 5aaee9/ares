@@ -7,6 +7,8 @@
 
 #[path = "orca_parity/artifacts.rs"]
 mod artifacts;
+#[path = "orca_parity/m73_profile.rs"]
+mod m73_profile;
 #[path = "orca_parity/option_coverage.rs"]
 mod option_coverage;
 #[path = "orca_parity/presets.rs"]
