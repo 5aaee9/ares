@@ -40,6 +40,19 @@ This wave's accepted slices:
 
 ## Deferred
 
+- **XY→Z junction estimator fidelity (2026-09-13 finding)**: the
+  timelapse position-clear fix (`e1ef40f0`, `3b27f36`)
+  upstream-correctly splits post-timelapse layer travels into
+  `G1 X..Y..F` + `G1 Z` legs (V-Core IDEX and Guider 2s now
+  byte-identical). But ares's planner estimates those split legs
+  ~2e-5 s differently from upstream's GCodeProcessor — visible as the
+  last-digit `estimated first layer printing time` float diff on
+  V-Core and as shifted M73 progress boundaries on ~19 Klipper
+  printers (M1 Pro, Hi, Q1 Pro, Q2; M73 lands one move earlier).
+  Next unit: audit the junction between a pure-XY block and a pure-Z
+  block (no shared axes, jerk-0/SET_VELOCITY_LIMIT configs) in
+  `planner/{mod,trapezoid}.rs` against upstream
+  `GCodeProcessor.cpp:316-395` junction/factor handling.
 - GCodeProcessor time-estimation parity (model printing time, M73
   placement) — the largest remaining divergence bucket; needs per-block
   trapezoid parity work.
