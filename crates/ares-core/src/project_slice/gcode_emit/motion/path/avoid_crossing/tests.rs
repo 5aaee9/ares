@@ -33,6 +33,8 @@ fn geometry() -> LayerGeometry<'static> {
             layer_slices: &[],
             perimeter_spacing: 0.0,
             top_surfaces: &[],
+            chunk_slices: &[],
+            chunk_perimeter_spacing: 0.0,
         },
     }
 }
@@ -60,6 +62,7 @@ fn rectangle_shell_routes_crossing_travels_along_inset_boundary() {
             offset,
             inset,
             after_skirt: true,
+            use_external: false,
         }),
         [MotionPoint {
             x: 114.389_38,
@@ -80,6 +83,7 @@ fn rectangle_shell_routes_crossing_travels_along_inset_boundary() {
             offset,
             inset,
             after_skirt: false,
+            use_external: false,
         }),
         [
             MotionPoint {
@@ -106,6 +110,7 @@ fn rectangle_shell_routes_crossing_travels_along_inset_boundary() {
             offset: (117.5, 117.5),
             inset,
             after_skirt: false,
+            use_external: false,
         }),
         [MotionPoint {
             x: 121.29,
@@ -141,6 +146,8 @@ fn boundary_builds_from_layer_slices() {
             layer_slices: layer,
             perimeter_spacing: 0.45,
             top_surfaces: &[],
+            chunk_slices: &[],
+            chunk_perimeter_spacing: 0.0,
         },
     };
     let super::boundary::BuildResult::Ready(boundary) = super::boundary::Boundary::build(

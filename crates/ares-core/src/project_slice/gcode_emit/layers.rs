@@ -142,7 +142,11 @@ pub(super) fn append(
         ..
     } = schedule;
 
-    let mut entry_geometry = |object_index: usize, layer_index: usize| -> EntryGeometry<'_> {
+    let mut entry_geometry = |object_index: usize,
+                              layer_index: usize,
+                              chunk_slices: &[ExPolygon],
+                              chunk_perimeter_spacing: f64|
+     -> EntryGeometry<'_> {
         let lower_boundary_lines = traversal.objects[object_index]
             .lower_slices(layer_index)
             .into_iter()
@@ -169,11 +173,14 @@ pub(super) fn append(
                 object_index,
                 layer_index,
             ),
+            chunk_slices: chunk_slices.to_vec(),
+            chunk_perimeter_spacing,
         }
     };
 
     let mut group_start = 0;
     let mut first_group = true;
+    let mut last_object_copy: Option<usize> = None;
     while group_start < merged.len() {
         let group_z = merged[group_start].0;
         let mut group_end = group_start;
@@ -186,6 +193,36 @@ pub(super) fn append(
             .collect();
         entries.sort_by_key(|(object_index, _)| print_position[*object_index]);
         group_start = group_end;
+        // Chunk-wide inputs for the external motion planner
+        // (`get_perimeter_spacing_external` averages the perimeter
+        // spacing over every object with slices at this print z,
+        // `AvoidCrossingPerimeters.cpp:511-529`).
+        let chunk_slices: Vec<ExPolygon> = entries
+            .iter()
+            .flat_map(|&(object_index, layer_index)| {
+                traversal.objects[object_index]
+                    .slices(layer_index)
+                    .unwrap_or(&[])
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        let chunk_perimeter_spacing = if entries.is_empty() {
+            0.0
+        } else {
+            entries
+                .iter()
+                .map(|&(object_index, layer_index)| {
+                    f64::from(
+                        traversal.objects[object_index]
+                            .perimeter_spacing(layer_index)
+                            .unwrap_or_default(),
+                    )
+                })
+                .sum::<f64>()
+                / entries.len() as f64
+        };
         let (first_object, first_layer) = entries[0];
         if first_group && first_layer == 0 {
             layer_gcode::append_print_preamble(
@@ -246,7 +283,7 @@ pub(super) fn append(
             entries.iter().find(|&&(object_index, _)| object_index == 0),
             &skirt,
         ) {
-            let geometry = entry_geometry(0, skirt_layer);
+            let geometry = entry_geometry(0, skirt_layer, &chunk_slices, chunk_perimeter_spacing);
             let lower_boundary = (!geometry.lower_boundary_lines.is_empty())
                 .then(|| crate::geometry::LineDistanceTree::new(&geometry.lower_boundary_lines));
             let motion_geometry = geometry.view(traversal, 0, skirt_layer, lower_boundary.as_ref());
@@ -280,11 +317,23 @@ pub(super) fn append(
             // `instance_to_print`, `GCode.cpp:5343-5345`); drop the cached
             // boundary so each entry rebuilds it from its own slices.
             state.avoid_boundary = None;
+            // `GCode.cpp:5380-5384`: when a new object copy starts, the
+            // first travel uses the external motion planner
+            // (`use_external_mp_once`).
+            if last_object_copy != Some(object_index) {
+                state.use_external_mp_once = true;
+                last_object_copy = Some(object_index);
+            }
             if object_index == 0
                 && layer_index == 0
                 && let Some(plan) = &brim
             {
-                let geometry = entry_geometry(object_index, layer_index);
+                let geometry = entry_geometry(
+                    object_index,
+                    layer_index,
+                    &chunk_slices,
+                    chunk_perimeter_spacing,
+                );
                 let lower_boundary = (!geometry.lower_boundary_lines.is_empty()).then(|| {
                     crate::geometry::LineDistanceTree::new(&geometry.lower_boundary_lines)
                 });
@@ -305,7 +354,12 @@ pub(super) fn append(
             };
             let spiral_body_layer = spiral.is_body_layer(layer, layer_index, f64::from(layer_z));
             state.spiral_vase_layer = spiral_body_layer;
-            let geometry = entry_geometry(object_index, layer_index);
+            let geometry = entry_geometry(
+                object_index,
+                layer_index,
+                &chunk_slices,
+                chunk_perimeter_spacing,
+            );
             let lower_boundary = (!geometry.lower_boundary_lines.is_empty())
                 .then(|| crate::geometry::LineDistanceTree::new(&geometry.lower_boundary_lines));
             let motion_geometry = geometry.view(

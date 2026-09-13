@@ -55,6 +55,8 @@ fn wipe_before_external_uses_the_source_rotated_inner_point() {
                 layer_slices: &[],
                 perimeter_spacing: 0.0,
                 top_surfaces: &[],
+                chunk_slices: &[],
+                chunk_perimeter_spacing: 0.0,
             },
         },
         &mut state,

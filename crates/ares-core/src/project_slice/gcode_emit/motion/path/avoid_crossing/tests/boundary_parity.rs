@@ -19,6 +19,8 @@ fn crossing_geometry(slices: &[ExPolygon]) -> AvoidCrossingGeometry<'_> {
         layer_slices: slices,
         perimeter_spacing: 0.189_955_74,
         top_surfaces: &[],
+        chunk_slices: &[],
+        chunk_perimeter_spacing: 0.0,
     }
 }
 
@@ -150,6 +152,7 @@ fn assert_route(start: (i64, i64), end: (i64, i64), expected: &[(i64, i64)]) {
             offset: (0.0, 0.0),
             inset: 0.0,
             after_skirt: false,
+            use_external: false,
         },
         Some(&mut boundary),
     )

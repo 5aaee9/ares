@@ -109,6 +109,7 @@ pub(super) fn emit(output: &mut Vec<u8>, state: &mut EmitState, request: Request
         // travels consume it; the skirt's own travels keep it armed.
         if !matches!(properties.feature, "Skirt" | "Brim") {
             state.avoid_crossing_disabled_once = false;
+            state.use_external_mp_once = false;
         }
         // Upstream never schedules a layer-start lift without a retraction
         // (`GCode.cpp:5692-5698`: `change_layer`'s own retract — gated on

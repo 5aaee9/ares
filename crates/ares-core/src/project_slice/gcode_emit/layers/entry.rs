@@ -9,6 +9,10 @@ pub(super) struct EntryGeometry<'a> {
         Option<&'a crate::project_slice::island_print_order::NearestSeamLayer>,
     pub(super) layer_slices: std::rc::Rc<[ExPolygon]>,
     pub(super) internal_surfaces: &'a [crate::project_slice::region_slices::RegionSurface],
+    /// The chunk-wide slice list and cross-object average spacing for the
+    /// external motion planner (`get_boundary_external`).
+    pub(super) chunk_slices: Vec<ExPolygon>,
+    pub(super) chunk_perimeter_spacing: f64,
 }
 
 impl EntryGeometry<'_> {
@@ -40,6 +44,8 @@ impl EntryGeometry<'_> {
                     .external_perimeter_width(layer_index)
                     .unwrap_or_default(),
                 top_surfaces: &self.top_surfaces,
+                chunk_slices: &self.chunk_slices,
+                chunk_perimeter_spacing: self.chunk_perimeter_spacing,
             },
         }
     }

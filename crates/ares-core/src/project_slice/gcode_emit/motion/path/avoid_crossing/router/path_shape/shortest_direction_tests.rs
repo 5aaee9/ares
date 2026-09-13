@@ -23,6 +23,8 @@ fn captured_boundary() -> Boundary {
             layer_slices: &slices,
             perimeter_spacing: 0.189_955_74,
             top_surfaces: &[],
+            chunk_slices: &[],
+            chunk_perimeter_spacing: 0.0,
         },
         CoordinateScale::Normal,
         [

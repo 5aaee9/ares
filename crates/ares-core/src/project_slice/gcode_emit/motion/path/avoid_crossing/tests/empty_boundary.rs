@@ -39,6 +39,7 @@ fn request(geometry: LayerGeometry<'_>) -> Request<'_> {
         geometry,
         offset: (160.0, 175.0),
         inset: 0.284_932_5,
+        use_external: false,
         after_skirt: false,
     }
 }
@@ -53,6 +54,8 @@ fn travel_to_empty_internal_boundary_after_top_subtraction_is_direct() {
             layer_slices: &slices,
             perimeter_spacing: 0.189_955_74,
             top_surfaces: &[&top],
+            chunk_slices: &[],
+            chunk_perimeter_spacing: 0.0,
         },
         ..geometry()
     };
@@ -98,6 +101,8 @@ fn travel_to_unavailable_internal_boundary_still_requests_rectangle_shell() {
             layer_slices: &slices,
             perimeter_spacing: 0.0,
             top_surfaces: &[],
+            chunk_slices: &[],
+            chunk_perimeter_spacing: 0.0,
         },
         ..geometry()
     };

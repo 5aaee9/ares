@@ -32,6 +32,7 @@ pub(in crate::project_slice::gcode_emit) fn route(request: Request<'_>) -> Vec<a
         offset,
         inset,
         after_skirt,
+        use_external: _,
     } = request;
     let Some(rect) = rectangle(&geometry, offset, inset) else {
         return Vec::new();

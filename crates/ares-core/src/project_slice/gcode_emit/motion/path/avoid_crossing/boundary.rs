@@ -34,6 +34,86 @@ pub(super) enum BuildResult {
 }
 
 impl Boundary {
+    /// `get_boundary_external` + the first `init_boundary` overload
+    /// (`AvoidCrossingPerimeters.cpp:1137-1189, 1187-1203`): every hole of
+    /// every print object at this print z, made CCW and expanded by half
+    /// the cross-object average perimeter spacing (miter join), then
+    /// reversed so normals point outward; the bbox is padded only by
+    /// `SCALED_EPSILON`, so travels clear of every hole stay outside and
+    /// route straight.
+    pub(in crate::project_slice::gcode_emit) fn build_external(
+        chunk_slices: &[ExPolygon],
+        perimeter_spacing_mm: f64,
+        scale: CoordinateScale,
+        endpoints: [Point; 2],
+    ) -> Result<BuildResult, ClipperError> {
+        let unit = |millimetres: f64| scale.checked_scale(millimetres);
+        let Some(scaled_spacing) = unit(perimeter_spacing_mm) else {
+            return Ok(BuildResult::Unavailable);
+        };
+        let scaled_spacing = scaled_spacing as f32;
+        // CW holes reversed to CCW before the positive offset
+        // (`polygons_reverse(holes_per_obj)`).
+        let holes = chunk_slices
+            .iter()
+            .flat_map(|expolygon| expolygon.holes())
+            .map(|hole| {
+                let mut points = hole.points().to_vec();
+                points.reverse();
+                Polygon::new(points)
+            })
+            .collect::<Vec<_>>();
+        if holes.is_empty() {
+            return Ok(BuildResult::Empty);
+        }
+        let expanded = offset_paths(&holes, 0.5 * scaled_spacing, JoinType::Miter, 3.0)?;
+        if expanded.is_empty() {
+            return Ok(BuildResult::Empty);
+        }
+        // Reverse every contour so the router's inward vertex offsets
+        // steer travels around the hole instead of into it.
+        let contours = expanded
+            .iter()
+            .map(|polygon| {
+                let mut points = polygon.points().to_vec();
+                points.reverse();
+                points
+            })
+            .collect::<Vec<_>>();
+        let (mut min, mut max) = contours_bounds(&contours);
+        for point in endpoints {
+            min = Point::new(min.x().min(point.x()), min.y().min(point.y()));
+            max = Point::new(max.x().max(point.x()), max.y().max(point.y()));
+        }
+        let epsilon = scale.checked_scale(SCALED_EPSILON).unwrap_or(100) as Coord;
+        let padded_min = Point::new(
+            min.x().saturating_sub(epsilon),
+            min.y().saturating_sub(epsilon),
+        );
+        let padded_max = Point::new(
+            max.x().saturating_add(epsilon),
+            max.y().saturating_add(epsilon),
+        );
+        let grid_resolution = unit(1.0).unwrap_or(1_000_000);
+        let grid = EdgeGrid::new_from_contours(
+            contours.iter().map(|contour| contour.as_slice()),
+            padded_min,
+            padded_max,
+            grid_resolution,
+        )?;
+        let contour_lengths = contours
+            .iter()
+            .map(|contour| cumulative_distances(contour))
+            .collect();
+        Ok(BuildResult::Ready(Boundary {
+            scaled_spacing,
+            contours,
+            grid,
+            contour_lengths,
+            bounds: (padded_min, padded_max),
+        }))
+    }
+
     pub(super) fn contour(&self, index: usize) -> &[Point] {
         &self.contours[index]
     }

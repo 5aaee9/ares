@@ -75,6 +75,11 @@ pub(in crate::project_slice::gcode_emit) struct EmitState {
     // (`disable_once`, `GCode.cpp:4448-4450`: a straight travel to the
     // first object point).
     pub(in crate::project_slice::gcode_emit) avoid_crossing_disabled_once: bool,
+    /// `use_external_mp_once` (`AvoidCrossingPerimeters.hpp:21`): armed
+    /// when a new object copy starts (`GCode.cpp:5380-5384`), the first
+    /// travel routes along the chunk-wide hole boundary; cleared with the
+    /// other once-modifiers after the emitted travel (`GCode.cpp:7431`).
+    pub(in crate::project_slice::gcode_emit) use_external_mp_once: bool,
     pub(in crate::project_slice::gcode_emit) pending_layer_retract: bool,
     pub(in crate::project_slice::gcode_emit) layer_change_travel_pending: bool,
     pub(in crate::project_slice::gcode_emit) pending_wipe_before_external_target:
@@ -120,6 +125,12 @@ pub(in crate::project_slice::gcode_emit) struct AvoidCrossingGeometry<'a> {
     pub(in crate::project_slice::gcode_emit) perimeter_spacing: f32,
     pub(in crate::project_slice::gcode_emit) external_perimeter_width: f32,
     pub(in crate::project_slice::gcode_emit) top_surfaces: &'a [&'a crate::geometry::ExPolygon],
+    /// Every print object's slices at this print z and the cross-object
+    /// average perimeter spacing, feeding the EXTERNAL motion planner's
+    /// hole boundary (`get_boundary_external`,
+    /// `AvoidCrossingPerimeters.cpp:1137-1189`).
+    pub(in crate::project_slice::gcode_emit) chunk_slices: &'a [crate::geometry::ExPolygon],
+    pub(in crate::project_slice::gcode_emit) chunk_perimeter_spacing: f64,
 }
 
 pub(in crate::project_slice::gcode_emit) fn begin_layer(

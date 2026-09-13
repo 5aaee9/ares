@@ -43,6 +43,8 @@ fn geometry() -> LayerGeometry<'static> {
             layer_slices: &[],
             perimeter_spacing: 0.0,
             top_surfaces: &[],
+            chunk_slices: &[],
+            chunk_perimeter_spacing: 0.0,
         },
     }
 }

@@ -53,6 +53,7 @@ pub(super) fn plan_route(
                 offset: state.offset,
                 inset: state.options.crossing_boundary_inset,
                 after_skirt,
+                use_external: state.use_external_mp_once,
             },
             state.avoid_boundary.as_mut().map(std::rc::Rc::make_mut),
         )
@@ -67,6 +68,7 @@ pub(super) fn plan_route(
                 offset: state.offset,
                 inset: state.options.crossing_boundary_inset,
                 after_skirt,
+                use_external: false,
             })
         })
     } else {

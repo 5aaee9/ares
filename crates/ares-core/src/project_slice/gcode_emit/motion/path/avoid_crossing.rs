@@ -16,6 +16,7 @@ use crate::project_slice::gcode_emit::motion::arc;
 pub(in crate::project_slice::gcode_emit) struct Boundary {
     safe_zone: Vec<crate::geometry::ExPolygon>,
     internal: Option<boundary::Boundary>,
+    external: Option<boundary::Boundary>,
 }
 pub(super) mod rectangle;
 pub(in crate::project_slice::gcode_emit) use rectangle::route as rectangle_route;
@@ -29,6 +30,9 @@ pub(super) struct Request<'a> {
     pub(super) offset: (f64, f64),
     pub(super) inset: f64,
     pub(super) after_skirt: bool,
+    /// `m_use_external_mp_once` — route along the chunk-wide hole boundary
+    /// (`AvoidCrossingPerimeters.cpp:1553-1556`).
+    pub(super) use_external: bool,
 }
 
 /// Initialize the layer safe zone; routing geometry is built only after a
@@ -39,6 +43,7 @@ pub(in crate::project_slice::gcode_emit) fn build_boundary(
     Some(Boundary {
         safe_zone: safe_zone::build(&geometry.avoid_crossing, geometry.scale).ok()?,
         internal: None,
+        external: None,
     })
 }
 
@@ -64,6 +69,7 @@ pub(super) fn route(
         offset,
         inset: _,
         after_skirt: _,
+        use_external,
     } = request;
     let boundary = boundary?;
     let scale = geometry.scale;
@@ -95,6 +101,7 @@ pub(super) fn route(
         .internal
         .as_ref()
         .is_none_or(|internal| !internal.contains(scaled_start) || !internal.contains(scaled_end))
+        && !use_external
     {
         boundary.internal = match boundary::Boundary::build(
             &geometry.avoid_crossing,
@@ -113,7 +120,30 @@ pub(super) fn route(
             boundary::BuildResult::Ready(internal) => Some(internal),
         };
     }
-    let boundary = boundary.internal.as_ref()?;
+    let boundary = if use_external {
+        // `get_boundary_external` builds from every object's holes at this
+        // print z; an empty hole set or a travel clear of it routes
+        // straight (`travel_to` :1557-1571, Liang-Barsky bbox gate).
+        if boundary.external.is_none() {
+            boundary.external = match boundary::Boundary::build_external(
+                geometry.avoid_crossing.chunk_slices,
+                geometry.avoid_crossing.chunk_perimeter_spacing,
+                scale,
+                [scaled_start, scaled_end],
+            )
+            .ok()?
+            {
+                boundary::BuildResult::Unavailable => None,
+                // No holes anywhere in the chunk: every travel stays
+                // outside the (empty) boundary bbox and routes straight.
+                boundary::BuildResult::Empty => return Some(Vec::new()),
+                boundary::BuildResult::Ready(external) => Some(external),
+            };
+        }
+        boundary.external.as_ref()?
+    } else {
+        boundary.internal.as_ref()?
+    };
     let (path, _intersections) =
         router::avoid_perimeters(boundary, scaled_start, scaled_end).ok()?;
     let mut output = Vec::with_capacity(path.len());
