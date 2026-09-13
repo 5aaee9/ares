@@ -82,15 +82,19 @@ fn deferred_bottom_only_lift_uses_the_target_layer_index() {
 
 #[test]
 fn layer_change_top_and_bottom_enforce_uses_the_new_layer_index() {
-    // `change_layer` increments `m_layer_index` BEFORE the change-layer
-    // retract (`GCode.cpp:5690-5696`), so `retract_lift_enforce =
-    // Top and Bottom` never satisfies its bottom clause at a layer change
-    // (the new index is never 0) unless the last role was top infill
-    // (`GCode.cpp:7682-7698`). LH Stinger (z_hop == layer step) relies on
-    // this: no lift is deferred and the layer travel stays a plain move.
+    // `change_layer` increments `m_layer_index` before the change-layer
+    // retract (`GCode.cpp:5690-5696`; `m_layer_index` starts at -1 so the
+    // first change-layer sees index 0). `retract_lift_enforce =
+    // Top and Bottom` therefore only defers a hop when the NEW layer
+    // index satisfies the gate (`GCode.cpp:7678-7705`): never via the
+    // bottom clause after the first layer, only via a top/ironing last
+    // role. LH Stinger (z_hop == layer step, Top and Bottom) relies on
+    // the 0 -> 1 transition deferring nothing, so the layer travel is a
+    // plain combined xyz move.
     let mut state = EmitState {
         layer_z: 0.4,
         writer_z: Some(0.2),
+        // The state already advanced to the layer the change enters.
         layer_index: 1,
         options: MotionOptions {
             retraction_length: 1.0,
@@ -101,12 +105,22 @@ fn layer_change_top_and_bottom_enforce_uses_the_new_layer_index() {
         },
         ..EmitState::default()
     };
-    let mut output = Vec::new();
 
-    retract_and_lift(&mut output, &mut state);
+    super::defer_layer_change_lift(&mut state);
 
     assert_eq!(state.pending_lift, None);
-    assert!(state.retracted);
+
+    // The print's first change-layer (index 0) still defers the hop, and
+    // a top-surface ending defers it on any layer.
+    state.layer_index = 0;
+    super::defer_layer_change_lift(&mut state);
+    assert_eq!(state.pending_lift, Some(LiftMode::Spiral));
+
+    state.layer_index = 7;
+    state.last_feature = Some("Top surface");
+    state.pending_lift = None;
+    super::defer_layer_change_lift(&mut state);
+    assert_eq!(state.pending_lift, Some(LiftMode::Spiral));
 }
 
 #[test]

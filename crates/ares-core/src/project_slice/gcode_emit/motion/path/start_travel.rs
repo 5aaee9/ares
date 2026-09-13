@@ -200,31 +200,13 @@ pub(super) fn emit(output: &mut Vec<u8>, state: &mut EmitState, request: Request
                 );
             }
         } else if layer_change_travel && state.retracted {
-            // A sloped/spiral hop replaces the travel's z word only when a
-            // hop was actually deferred for this travel (`lifted_for_travel`
-            // captures the pending lift before emission); with no lift in
-            // play (e.g. the enforce gate blocked the change-layer hop),
-            // `m_need_change_layer_lift_z` forces the plain combined xyz
-            // move (`GCode.cpp:7479-7482`).
-            if state.options.z_hop > 0.0
-                && retraction::uses_sloped_lift(state.options.z_hop_type)
-                && lifted_for_travel
-            {
-                travel_emit::xy(output, travel_x, travel_y, state.travel_feedrate);
-            } else if state.lifted {
-                output.extend_from_slice(
-                    format!(
-                        "G1 X{} Y{} Z{}\n",
-                        format_axis(travel_x),
-                        format_axis(travel_y),
-                        format_z(state.layer_z + state.options.z_hop)
-                    )
-                    .as_bytes(),
-                );
-            } else {
-                travel_emit::xyz(output, travel_x, travel_y, target_z, state.travel_feedrate);
-                travel_set_layer_z = true;
-            }
+            // With a hop actually deferred, the earlier `state.lifted`
+            // branch emitted the ramp and the combined layer+hop travel;
+            // with no hop in play (the enforce gate blocked the
+            // change-layer hop), `m_need_change_layer_lift_z`
+            // (`GCode.cpp:7479-7482`) forces the plain combined xyz move.
+            travel_emit::xyz(output, travel_x, travel_y, target_z, state.travel_feedrate);
+            travel_set_layer_z = true;
         } else if state.retracted
             && first_position
             && state.options.z_hop > 0.0

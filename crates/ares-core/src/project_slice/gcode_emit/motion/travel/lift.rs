@@ -205,19 +205,6 @@ pub(super) fn append_spiral_vase(output: &mut Vec<u8>, state: &mut EmitState) {
 }
 
 fn append_spiral(output: &mut Vec<u8>, state: &EmitState, raised_z: f64, i: f64, j: f64) {
-    if std::env::var_os("ARES_DEBUG_SPIRAL").is_some() {
-        eprintln!(
-            "SPIRAL layer_z={} raised={} hop={} writer_z={:?} source_layer_z={} retracted={} lifted={} pending={:?}",
-            state.layer_z,
-            raised_z,
-            state.options.z_hop,
-            state.writer_z,
-            state.source_layer_z,
-            state.retracted,
-            state.lifted,
-            state.pending_lift
-        );
-    }
     if state.options.enable_arc_fitting {
         output.extend_from_slice(b"G17\n");
         output.extend_from_slice(
