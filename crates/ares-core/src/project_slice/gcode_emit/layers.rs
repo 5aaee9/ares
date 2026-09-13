@@ -99,8 +99,10 @@ pub(super) fn append(
     // (`Layer::lslices` covers all instances of the print object;
     // `AvoidCrossingPerimeters.cpp:1100`). Copies of one source share the
     // layer layout, so records are matched by slice_z.
-    let mut layer_boundary_cache: std::collections::HashMap<usize, std::rc::Rc<[ExPolygon]>> =
-        std::collections::HashMap::new();
+    let mut layer_boundary_cache: std::collections::HashMap<
+        (usize, usize),
+        std::rc::Rc<[ExPolygon]>,
+    > = std::collections::HashMap::new();
     // FanMover construction mirrors GCode.cpp:3727-3740 (gate:
     // fan_speedup_time != 0 || fan_kickstart > 0).
     let fan_mover_gate = (|| {

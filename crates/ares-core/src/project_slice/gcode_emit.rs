@@ -187,12 +187,25 @@ pub(super) fn emit(
 /// of one source object are separate traversal objects here, but one
 /// PrintObject upstream — their islands union into one boundary. The
 /// cache holds one union per layer_index (all copies share the layout).
+/// The avoid-crossing boundary covers every copy of the print object at
+/// the layer's slice_z (`Layer::lslices`,
+/// `AvoidCrossingPerimeters.cpp:1100`): copies of one source object are
+/// separate traversal objects here, but one PrintObject upstream — their
+/// islands union into one boundary. The cache is keyed by the source
+/// object and layer index; distinct source objects never share a union.
 fn layer_boundary_slices_rc(
     traversal: &PreparedPostClassicTraversal,
     object_index: usize,
     layer_index: usize,
-    cache: &mut std::collections::HashMap<usize, std::rc::Rc<[ExPolygon]>>,
+    cache: &mut std::collections::HashMap<(usize, usize), std::rc::Rc<[ExPolygon]>>,
 ) -> std::rc::Rc<[ExPolygon]> {
+    let (source_object_index, _) = traversal.objects[object_index]
+        .predecessor
+        .predecessor
+        .predecessor
+        .predecessor
+        .object
+        .identity();
     let Some(record) = traversal.objects[object_index]
         .records
         .get(layer_index)
@@ -206,7 +219,7 @@ fn layer_boundary_slices_rc(
     };
     let _ = record;
     cache
-        .entry(layer_index)
+        .entry((source_object_index, layer_index))
         .or_insert_with(|| {
             let mut all: Vec<ExPolygon> = Vec::new();
             for slices in traversal.objects[object_index].occurrence_slices(layer_index) {
