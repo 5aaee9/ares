@@ -150,20 +150,31 @@ pub(in crate::project_slice::gcode_emit) fn begin_layer(
     } else {
         state.options.travel_feedrate
     };
+    // `GCode.cpp:4764-4776, 4794-4797`: the first-layer acceleration emit
+    // and the second-layer reset are both gated on `default_acceleration > 0`
+    // AND `initial_layer_acceleration > 0`; without both, no M204 is emitted
+    // at the layer change.
+    let has_default_acceleration = state.options.default_acceleration > 0;
     let acceleration = match layer_index {
-        0 => Some(state.options.initial_layer_acceleration),
-        1 => Some(state.options.default_acceleration),
+        0 if has_default_acceleration && state.options.initial_layer_acceleration > 0 => {
+            Some(state.options.initial_layer_acceleration)
+        }
+        1 if has_default_acceleration && state.options.initial_layer_acceleration > 0 => {
+            Some(state.options.default_acceleration)
+        }
         _ => None,
     };
-    if let Some(acceleration) = acceleration {
-        let jerk = if state.options.default_jerk <= 0.0 {
-            0.0
-        } else if layer_index == 0 && state.options.initial_layer_jerk > 0.0 {
-            state.options.initial_layer_jerk
-        } else {
-            state.options.default_jerk
-        };
-        set_layer_acceleration_and_jerk(output, state, acceleration, jerk);
+    // `GCode.cpp:4767-4776`: jerk emission is independent of the
+    // acceleration emit; `default_jerk > 0 && initial_layer_jerk > 0` gate
+    // applies on both the first-layer value and the second-layer reset.
+    let has_layer_jerk = state.options.default_jerk > 0.0 && state.options.initial_layer_jerk > 0.0;
+    let jerk = match layer_index {
+        0 if has_layer_jerk => state.options.initial_layer_jerk,
+        1 if has_layer_jerk => state.options.default_jerk,
+        _ => 0.0,
+    };
+    if acceleration.is_some() || jerk > 0.0 {
+        set_layer_acceleration_and_jerk(output, state, acceleration.unwrap_or(0), jerk);
     }
 }
 

@@ -69,6 +69,7 @@ impl RollingPlanner {
     fn process(&mut self, keep: usize) -> Vec<f64> {
         plan(&mut self.blocks);
         let process_len = self.blocks.len() - keep;
+        dump_blocks(&self.blocks[..process_len]);
         let times = self.blocks[..process_len]
             .iter()
             .map(|block| f64::from(block.time))
@@ -116,6 +117,42 @@ pub(super) fn planned_trapezoid_time(
         direction: [0.0; 4],
         axis_feedrate: [0.0; 4],
     })
+}
+
+/// Diagnostic per-block dump gated by `ARES_DUMP_BLOCKS`: appends
+/// `<ordinal> <distance> <speed> <accel> <entry> <exit> <safe> <time>` per
+/// finalized block so the planner's junction chain can be compared against
+/// upstream `TimeEstimator` instrumentation. No effect when unset.
+fn dump_blocks(blocks: &[PlannedBlock]) {
+    use std::io::Write;
+    static DUMP_PATH: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    let Some(path) = DUMP_PATH
+        .get_or_init(|| std::env::var("ARES_DUMP_BLOCKS").ok())
+        .as_ref()
+    else {
+        return;
+    };
+    static ORDINAL: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .unwrap();
+    for block in blocks {
+        let ordinal = ORDINAL.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        writeln!(
+            file,
+            "{ordinal} {} {} {} {} {} {} {}",
+            block.distance,
+            block.cruise,
+            block.acceleration,
+            block.entry,
+            block.exit,
+            block.safe,
+            block.time
+        )
+        .unwrap();
+    }
 }
 
 fn plan(blocks: &mut [PlannedBlock]) {

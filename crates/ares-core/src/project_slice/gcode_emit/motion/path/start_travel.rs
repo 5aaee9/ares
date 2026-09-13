@@ -256,14 +256,32 @@ pub(super) fn emit(output: &mut Vec<u8>, state: &mut EmitState, request: Request
                 );
                 state.current_feedrate = z_feedrate;
             } else {
-                travel_emit::xyz(output, travel_x, travel_y, target_z, state.travel_feedrate);
+                // `travel_to_xyz`'s force-z/`will_move_z` else-branch emits
+                // the combined move at `config.travel_speed` UNCONDITIONALLY
+                // (`GCodeWriter.cpp:783-806`) — the first-layer travel speed
+                // does not apply to a layer-change approach that carries Z.
+                travel_emit::xyz(
+                    output,
+                    travel_x,
+                    travel_y,
+                    target_z,
+                    state.options.travel_feedrate,
+                );
             }
             travel_set_layer_z = true;
         } else if let Some(z) = slope_start_z {
             travel_emit::xyz(output, travel_x, travel_y, z, state.travel_feedrate);
             travel_set_layer_z = true;
         } else {
-            travel_emit::xy(output, travel_x, travel_y, state.travel_feedrate);
+            // Same `travel_to_xyz` else-branch: the unclear-position split
+            // emits the XY leg at `config.travel_speed` without the
+            // first-layer override (`GCodeWriter.cpp:793-798`).
+            let xy_feedrate = if first_position {
+                state.options.travel_feedrate
+            } else {
+                state.travel_feedrate
+            };
+            travel_emit::xy(output, travel_x, travel_y, xy_feedrate);
             // The print's first travel from an unknown position always
             // splits: the unclear-position branch of `travel_to_xyz`
             // (`GCodeWriter.cpp:754+`) emits XY then `_travel_to_z`
