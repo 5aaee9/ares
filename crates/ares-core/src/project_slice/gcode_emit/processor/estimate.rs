@@ -142,6 +142,9 @@ impl Estimate {
         }
         let (times, trailing_delay) = scheduled_times(&blocks, &events);
         debug_assert_eq!(block_line_ids.len(), times.len());
+        // Upstream's cache entries store `float(time)` from the double
+        // accumulator (`GCodeProcessor.cpp:576`), so the M73 boundary chain
+        // accumulates in f64 and rounds to f32 per entry.
         let mut cumulative = 0.0;
         let cache = block_line_ids
             .into_iter()
