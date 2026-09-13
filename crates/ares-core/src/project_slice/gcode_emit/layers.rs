@@ -273,7 +273,7 @@ pub(super) fn append(
                 state.origin = (center_x, center_y);
                 state.offset = (center_x - extruder_offset.0, center_y - extruder_offset.1);
             }
-            if first_group
+            if object_index == 0
                 && layer_index == 0
                 && let Some(plan) = &brim
             {
