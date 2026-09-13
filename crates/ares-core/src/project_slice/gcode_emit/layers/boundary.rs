@@ -1,5 +1,8 @@
 //! `GCode.cpp::change_layer` boundary emission: the layer-change labels,
 //! retraction deferral and state advance that open every layer chunk.
+#[cfg(test)]
+mod tests;
+
 use super::super::{
     GenerationMetadata, PreparedPostClassicTraversal, SliceError, footprint,
     format_processor_float, layer_gcode, machine, motion, spiral_vase, timelapse,
@@ -10,6 +13,26 @@ pub(super) struct Boundary<'a> {
     pub layer_change_template: &'a layer_gcode::LayerChangeTemplate,
     pub metadata: GenerationMetadata,
     pub first_layer_bounds: Option<footprint::FirstLayerBounds>,
+}
+
+/// Advances the emission state into the new layer. `change_layer`
+/// increments `m_layer_index` BEFORE its change-layer retract
+/// (`GCode.cpp:5690-5696`), so the deferred hop's
+/// `retract_lift_enforce` bottom/top gate must see the NEW layer
+/// index — the index advance strictly precedes the deferral.
+pub(in crate::project_slice::gcode_emit::layers) fn advance_for_layer(
+    state: &mut motion::EmitState,
+    precise_layer_z: f64,
+    layer_z: f32,
+    layer_index: usize,
+    layer_retract_pending: bool,
+) {
+    state.layer_z = f64::from(layer_z);
+    state.source_layer_z = precise_layer_z;
+    state.layer_index = layer_index;
+    if layer_retract_pending {
+        motion::defer_layer_change_lift(state);
+    }
 }
 
 pub(super) struct BoundaryAdvance<'a> {
@@ -143,16 +166,13 @@ pub(super) fn append<'a>(
     // (`GCode.cpp:5690` change_layer retract precedes travel_to_z;
     // `GCodeWriter.cpp:633-639` gates on `m_pos.z()`).
     let previous_state_layer_z = state.layer_z;
-    state.layer_z = f64::from(layer_z);
-    state.source_layer_z = *precise_layer_z;
-    state.layer_index = layer_index;
-    if layer_retract_pending {
-        // `change_layer` increments `m_layer_index` BEFORE the
-        // change-layer retract (`GCode.cpp:5690-5696`), so the
-        // `retract_lift_enforce` bottom/top gate evaluates at the
-        // NEW layer index — defer only after the index advanced.
-        motion::defer_layer_change_lift(state);
-    }
+    advance_for_layer(
+        state,
+        *precise_layer_z,
+        layer_z,
+        layer_index,
+        layer_retract_pending,
+    );
     motion::flush_pending_retract_lift(output, state, previous_state_layer_z);
     motion::begin_layer(
         output,
